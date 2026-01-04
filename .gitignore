@@ -7,6 +7,10 @@
 .env.local
 .env.*.local
 
+# Claude instructions
+claude.md
+CLAUDE.md
+
 # Node.js
 node_modules/
 npm-debug.log*
