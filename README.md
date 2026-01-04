@@ -1,10 +1,7 @@
 # TeamSync Editor
 
-A white-labeled Collabora Online deployment with WOPI integration, built for production use.
-
 ## Features
 
-- **White-labeled Collabora Online** - Custom branding with MPL 2.0 compliance
 - **WOPI Protocol Implementation** - Full WOPI host in Node.js/TypeScript
 - **S3/MinIO Storage** - Scalable document storage with S3 API
 - **OAuth2/OIDC Authentication** - Enterprise-ready authentication
@@ -67,8 +64,8 @@ A white-labeled Collabora Online deployment with WOPI integration, built for pro
               ┌───────────────┼───────────────┐
               ▼               ▼               ▼
       ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
-      │  Collabora   │ │  WOPI Host   │ │    MinIO     │
-      │   Online     │ │  (Node.js)   │ │  (Storage)   │
+      │  TeamSync    │ │  WOPI Host   │ │    MinIO     │
+      │   Editor     │ │  (Node.js)   │ │  (Storage)   │
       │   (:9980)    │ │   (:3000)    │ │   (:9000)    │
       └──────────────┘ └──────────────┘ └──────────────┘
              │                │                │
@@ -118,16 +115,6 @@ const { iframeSrc, accessToken, accessTokenTtl } = await response.json();
 // 2. Embed the editor
 document.getElementById('editor').src = iframeSrc;
 ```
-
-## Security Checklist
-
-- [ ] Strong JWT_SECRET set (32+ characters)
-- [ ] MINIO_ROOT_PASSWORD is strong and unique
-- [ ] SSL certificates configured
-- [ ] Admin console disabled (`COOL_ADMIN_USER` empty)
-- [ ] WOPI hosts restricted in coolwsd.xml
-- [ ] Firewall blocks port 9980 externally
-- [ ] OAuth2/OIDC provider configured
 
 ## Production Deployment
 
