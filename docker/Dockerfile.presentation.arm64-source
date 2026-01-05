@@ -57,9 +57,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libcap2-bin \
     libcdr-dev \
     libclucene-dev \
-    libcmis-dev \
     libcppunit-dev \
-    libcurl4-openssl-dev \
+    libcurl4-gnutls-dev \
     libe-book-dev \
     libepoxy-dev \
     libetonyek-dev \
@@ -231,7 +230,6 @@ RUN echo "==> Configuring LibreOffice build (Impress-optimized)..." \
     --with-system-libqxp \
     --with-system-libnumbertext \
     --with-system-liblangtag \
-    --with-system-libcmis \
     --with-system-librevenge \
     --with-system-clucene \
     --with-system-xmlsec \
@@ -495,7 +493,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libqxp-0.0-0 \
     libnumbertext-1.0-1 \
     liblangtag1 \
-    libcmis-0.6-6 \
     librevenge-0.0-0 \
     libclucene-core1v5 \
     libxmlsec1-openssl \
