@@ -216,7 +216,6 @@ RUN echo "==> Configuring LibreOffice build..." \
     --with-system-libpng \
     --with-system-jpeg \
     --with-system-boost \
-    --with-system-harfbuzz \
     --with-system-nss \
     --with-system-hunspell \
     --with-system-cairo \
