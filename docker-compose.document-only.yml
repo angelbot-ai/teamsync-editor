@@ -1,0 +1,94 @@
+# =============================================================================
+# TeamSync Editor - Document Only (for focused testing)
+# =============================================================================
+#
+# This simplified docker-compose file runs only the Document service
+# for focused testing and debugging.
+#
+# Usage:
+#   docker compose -f docker-compose.document-only.yml up -d
+#
+# Ports:
+#   - 9980: TeamSync Document (Word processor)
+#   - 8080: Sample Application (WOPI host)
+#
+# =============================================================================
+
+services:
+  # ===========================================================================
+  # TeamSync Document - Word Processor
+  # Handles: .docx, .doc, .odt, .rtf, .txt
+  # ===========================================================================
+  teamsync-document:
+    image: teamsync-document:latest
+    container_name: teamsync-document
+    ports:
+      - "9980:9980"
+    environment:
+      - TEAMSYNC_PRODUCT=document
+      - SSL_ENABLE=false
+      - SSL_TERMINATION=true
+      - LOG_LEVEL=trace
+      - COOL_ADMIN_USER=admin
+      - COOL_ADMIN_PASSWORD=admin123
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    cap_add:
+      - MKNOD
+      - SYS_CHROOT
+      - FOWNER
+      - CHOWN
+      - SYS_ADMIN
+    security_opt:
+      - seccomp:unconfined
+      - apparmor:unconfined
+    networks:
+      - teamsync-network
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "--max-time", "30", "http://localhost:9980/hosting/discovery"]
+      interval: 60s
+      timeout: 60s
+      start_period: 300s
+      retries: 10
+    restart: unless-stopped
+
+  # ===========================================================================
+  # Sample Application - WOPI Host & Demo UI
+  # ===========================================================================
+  sample-app:
+    build:
+      context: ./sample-app
+      dockerfile: Dockerfile
+    image: teamsync-sample-app:latest
+    container_name: teamsync-sample-app
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      # Internal URLs (Docker network) - for server-to-server communication
+      - COLLABORA_DOCUMENT_URL=http://teamsync-document:9980
+      # Public URLs (localhost) - for browser iframe access
+      - COLLABORA_DOCUMENT_PUBLIC_URL=http://localhost:9980
+      - PUBLIC_URL=http://localhost:8080
+      - WOPI_CALLBACK_URL=http://sample-app:8080
+      - JWT_SECRET=local-dev-secret-key-change-in-production-32chars
+      - STANDALONE_MODE=true
+      # Disable sheets and presentation for now
+      - COLLABORA_SHEETS_URL=
+      - COLLABORA_PRESENTATION_URL=
+    depends_on:
+      teamsync-document:
+        condition: service_started
+    networks:
+      - teamsync-network
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+    restart: unless-stopped
+
+networks:
+  teamsync-network:
+    driver: bridge

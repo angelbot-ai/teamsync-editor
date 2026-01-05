@@ -1,0 +1,10 @@
+# Railway deployment Dockerfile for TeamSync Document
+# This pulls the pre-built image from IBM Cloud Registry
+FROM us.icr.io/teamsync/teamsync-document:latest
+
+# Environment variables for Railway
+ENV PORT=9980
+ENV domain=localhost
+
+# Expose the port
+EXPOSE 9980

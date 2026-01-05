@@ -230,9 +230,13 @@ echo ""
 # =============================================================================
 # Build command line arguments
 # =============================================================================
+# Use PORT env var if set (Railway, Render, etc.), otherwise default to 9980
+LISTEN_PORT="${PORT:-9980}"
+echo "  Listening on port: $LISTEN_PORT"
+
 COOLWSD_ARGS=(
     "--config-file=${CONFIG_FILE}"
-    "--port=9980"
+    "--port=${LISTEN_PORT}"
     "--disable-cool-user-checking"
     "--lo-template-path=/opt/lokit"
     "--o:child_root_path=/opt/cool/child-roots"

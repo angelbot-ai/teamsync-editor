@@ -59,11 +59,12 @@ for arg in "$@"; do
             echo "Usage: $0 [minimal] [variant...] [--no-cache] [--push]"
             echo ""
             echo "Variants:"
-            echo "  document      Build TeamSync Document (Word processor)"
-            echo "  sheets        Build TeamSync Sheets (Spreadsheet)"
-            echo "  presentation  Build TeamSync Presentation"
-            echo "  all           Build combined TeamSync Editor"
-            echo "  (no variant)  Build all variants"
+            echo "  document         Build TeamSync Document (Word processor)"
+            echo "  sheets           Build TeamSync Sheets (Spreadsheet)"
+            echo "  presentation     Build TeamSync Presentation"
+            echo "  all              Build combined TeamSync Editor"
+            echo "  writer-optimized Build Writer-only from source (4-6 hours)"
+            echo "  (no variant)     Build all standard variants"
             echo ""
             echo "Options:"
             echo "  minimal       Build minimal extraction images (requires source images)"
@@ -85,7 +86,7 @@ for arg in "$@"; do
             echo "  REGISTRY=ghcr.io/org $0 --push  # Build and push"
             exit 0
             ;;
-        document|sheets|presentation|all)
+        document|sheets|presentation|all|writer-optimized)
             VARIANTS+=("$arg")
             ;;
         *)
@@ -165,6 +166,15 @@ build_variant() {
             dockerfile="docker/Dockerfile"
             image_name="teamsync-editor"
             brand_name="TeamSync Editor"
+            ;;
+        writer-optimized)
+            dockerfile="docker/Dockerfile.writer-optimized"
+            image_name="teamsync-document"
+            brand_name="TeamSync Document (Optimized)"
+            # Override tag for optimized builds
+            if [ "${IMAGE_TAG}" = "latest" ]; then
+                IMAGE_TAG="optimized"
+            fi
             ;;
         *)
             echo "ERROR: Unknown variant: $variant"
@@ -371,6 +381,9 @@ for variant in "${VARIANTS[@]}"; do
             ;;
         all)
             image_name="teamsync-editor"
+            ;;
+        writer-optimized)
+            image_name="teamsync-document"
             ;;
     esac
 

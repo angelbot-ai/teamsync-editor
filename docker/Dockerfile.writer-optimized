@@ -1,0 +1,531 @@
+# =============================================================================
+# TeamSync Document - Writer-Only Optimized Build (FROM SOURCE)
+#
+# This Dockerfile builds BOTH LibreOffice and Collabora Online from source,
+# including ONLY Writer components for maximum optimization.
+#
+# Handles: .docx, .doc, .odt, .rtf, .txt
+# Target size: < 500 MB
+# Build time: 4-6 hours
+# MPL 2.0 Compliant
+#
+# Usage:
+#   docker build -f docker/Dockerfile.writer-optimized \
+#     --platform linux/amd64 \
+#     -t teamsync-document:optimized .
+#
+# Or use the build script:
+#   ./docker/scripts/build.sh writer-optimized
+#
+# =============================================================================
+
+# =============================================================================
+# STAGE 1: Builder Base - Install ALL build dependencies
+# =============================================================================
+FROM --platform=linux/amd64 ubuntu:22.04 AS builder-base
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install LibreOffice and Collabora build dependencies
+# This is a large layer but gets cached for subsequent builds
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Core build tools
+    build-essential \
+    git \
+    automake \
+    autoconf \
+    libtool \
+    pkg-config \
+    make \
+    ccache \
+    # LibreOffice specific build tools
+    bison \
+    flex \
+    gperf \
+    # X11 and graphics libraries (needed for LOKit even in headless mode)
+    libfontconfig1-dev \
+    libfreetype6-dev \
+    libxrender-dev \
+    libxext-dev \
+    libx11-dev \
+    libxrandr-dev \
+    libxinerama-dev \
+    # OpenGL (minimal, for some rendering paths)
+    libgl-dev \
+    libegl-dev \
+    libglu1-mesa-dev \
+    # Cairo and Pango for text rendering
+    libcairo2-dev \
+    libpango1.0-dev \
+    # Boost libraries
+    libboost-dev \
+    libboost-date-time-dev \
+    libboost-filesystem-dev \
+    libboost-iostreams-dev \
+    libboost-locale-dev \
+    # Testing framework
+    libcppunit-dev \
+    # Network and SSL
+    libcurl4-openssl-dev \
+    libssl-dev \
+    libnss3-dev \
+    libnspr4-dev \
+    # XML processing
+    libxml2-dev \
+    libxslt1-dev \
+    libexpat1-dev \
+    # Spell checking and language
+    libhunspell-dev \
+    libhyphen-dev \
+    # Font rendering
+    libgraphite2-dev \
+    libharfbuzz-dev \
+    libicu-dev \
+    # Image libraries
+    libjpeg-dev \
+    libpng-dev \
+    zlib1g-dev \
+    libtiff-dev \
+    liblcms2-dev \
+    libwebp-dev \
+    # Document format libraries (for import filters)
+    libabw-dev \
+    libcdr-dev \
+    libcmis-dev \
+    libe-book-dev \
+    libepubgen-dev \
+    libfreehand-dev \
+    liblangtag-dev \
+    libmspub-dev \
+    libmwaw-dev \
+    libodfgen-dev \
+    liborcus-dev \
+    libpagemaker-dev \
+    libqxp-dev \
+    librevenge-dev \
+    libstaroffice-dev \
+    libvisio-dev \
+    libwpd-dev \
+    libwpg-dev \
+    libwps-dev \
+    libzmf-dev \
+    # Collabora Online dependencies
+    libcap-dev \
+    libcap2-bin \
+    libpam-dev \
+    libzstd-dev \
+    libpoco-dev \
+    # Python for build scripts
+    python3 \
+    python3-lxml \
+    python3-polib \
+    # Utilities
+    wget \
+    curl \
+    ca-certificates \
+    fontconfig \
+    cpio \
+    rsync \
+    zip \
+    unzip \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js 18 LTS for Collabora browser build
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
+    apt-get install -y nodejs && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+# =============================================================================
+# STAGE 2: LibreOffice Core - Build from Source (Writer-Only)
+# =============================================================================
+FROM builder-base AS locore
+
+ARG LO_VERSION=libreoffice-24-8
+
+WORKDIR /build
+
+# Clone LibreOffice core (shallow clone to save time and space)
+RUN echo "Cloning LibreOffice ${LO_VERSION}..." && \
+    git clone --depth 1 --branch ${LO_VERSION} \
+    https://github.com/LibreOffice/core.git libreoffice
+
+WORKDIR /build/libreoffice
+
+# Configure LibreOffice for Writer-only, headless, optimized build
+# This is the key optimization - disabling everything except Writer
+RUN echo "Configuring LibreOffice for Writer-only build..." && \
+    ./autogen.sh \
+    # ===========================================
+    # Disable unnecessary applications/features
+    # ===========================================
+    --disable-avmedia \
+    --disable-database-connectivity \
+    --disable-lpsolve \
+    --disable-coinmp \
+    --disable-report-builder \
+    --disable-firebird-sdbc \
+    --disable-postgresql-sdbc \
+    --disable-mariadb-sdbc \
+    --disable-sdremote \
+    --disable-sdremote-bluetooth \
+    --disable-gstreamer-1-0 \
+    --disable-lotuswordpro \
+    --disable-odk \
+    --disable-extension-integration \
+    --disable-extension-update \
+    --disable-scripting-beanshell \
+    --disable-scripting-javascript \
+    --disable-pdfimport \
+    --disable-pdfium \
+    --disable-skia \
+    # ===========================================
+    # Headless/server optimizations
+    # ===========================================
+    --disable-gui \
+    --disable-gtk3 \
+    --disable-gtk4 \
+    --disable-qt5 \
+    --disable-qt6 \
+    --disable-kf5 \
+    --disable-kf6 \
+    --disable-dbus \
+    --disable-cups \
+    --disable-randr \
+    --disable-dconf \
+    --disable-gio \
+    --disable-cairo-canvas \
+    --disable-opengl \
+    --disable-opencl \
+    --disable-vulkan \
+    # ===========================================
+    # Build optimizations
+    # ===========================================
+    --enable-release-build \
+    --enable-optimized \
+    # ===========================================
+    # Use system libraries where possible
+    # ===========================================
+    --with-system-zlib \
+    --with-system-jpeg \
+    --with-system-png \
+    --with-system-expat \
+    --with-system-curl \
+    --with-system-nss \
+    --with-system-icu \
+    --with-system-hunspell \
+    --with-system-graphite \
+    --with-system-harfbuzz \
+    --with-system-libxml \
+    --with-system-boost \
+    --with-system-lcms2 \
+    --with-system-librevenge \
+    --with-system-libabw \
+    --with-system-libcdr \
+    --with-system-libcmis \
+    --with-system-libebook \
+    --with-system-libepubgen \
+    --with-system-libfreehand \
+    --with-system-liblangtag \
+    --with-system-libmspub \
+    --with-system-libmwaw \
+    --with-system-libodfgen \
+    --with-system-liborcus \
+    --with-system-libpagemaker \
+    --with-system-libqxp \
+    --with-system-libstaroffice \
+    --with-system-libvisio \
+    --with-system-libwpd \
+    --with-system-libwpg \
+    --with-system-libwps \
+    --with-system-libzmf \
+    # ===========================================
+    # Remove unnecessary components
+    # ===========================================
+    --without-java \
+    --without-junit \
+    --without-doxygen \
+    --without-help \
+    --without-helppack-integration \
+    --without-myspell-dicts \
+    --without-galleries \
+    --without-templates \
+    --without-export-validation \
+    --without-fonts \
+    # ===========================================
+    # LOKit for Collabora Online
+    # ===========================================
+    --enable-mergedlibs \
+    --with-distro=CPLinux \
+    --prefix=/opt/lokit
+
+# Build LibreOffice (this takes 3-5 hours)
+RUN echo "Building LibreOffice (this will take several hours)..." && \
+    make -j$(nproc)
+
+# Install to staging directory
+RUN echo "Installing LibreOffice..." && \
+    make DESTDIR=/install install
+
+# =============================================================================
+# AGGRESSIVE CLEANUP - Remove everything except Writer components
+# =============================================================================
+RUN echo "Performing aggressive Writer-only cleanup..." && \
+    cd /install/opt/lokit && \
+    # Remove Calc-specific files
+    rm -rf share/config/soffice.cfg/scalc/ 2>/dev/null || true && \
+    rm -rf share/config/soffice.cfg/modules/scalc/ 2>/dev/null || true && \
+    # Remove Impress-specific files
+    rm -rf share/config/soffice.cfg/simpress/ 2>/dev/null || true && \
+    rm -rf share/config/soffice.cfg/modules/simpress/ 2>/dev/null || true && \
+    # Remove Draw-specific files
+    rm -rf share/config/soffice.cfg/sdraw/ 2>/dev/null || true && \
+    rm -rf share/config/soffice.cfg/modules/sdraw/ 2>/dev/null || true && \
+    # Remove Math-specific files
+    rm -rf share/config/soffice.cfg/smath/ 2>/dev/null || true && \
+    rm -rf share/config/soffice.cfg/modules/smath/ 2>/dev/null || true && \
+    # Remove Base-specific files
+    rm -rf share/config/soffice.cfg/modules/dbapp/ 2>/dev/null || true && \
+    rm -rf share/config/soffice.cfg/modules/dbbrowser/ 2>/dev/null || true && \
+    rm -rf share/config/soffice.cfg/modules/dbquery/ 2>/dev/null || true && \
+    rm -rf share/config/soffice.cfg/modules/dbreport/ 2>/dev/null || true && \
+    rm -rf share/config/soffice.cfg/modules/dbtable/ 2>/dev/null || true && \
+    # Remove gallery, templates, samples, wizards
+    rm -rf share/gallery/ share/template/ share/samples/ 2>/dev/null || true && \
+    rm -rf share/extensions/ share/wizards/ help/ 2>/dev/null || true && \
+    rm -rf share/autotext/ share/autocorr/ share/Scripts/ 2>/dev/null || true && \
+    rm -rf share/basic/Tutorials/ 2>/dev/null || true && \
+    rm -rf share/config/images_*.zip 2>/dev/null || true && \
+    # Keep only English locale files
+    find share/registry -name "*.xcd" \
+         ! -name "main.xcd" ! -name "writer.xcd" \
+         ! -name "Langpack-en*.xcd" ! -name "*en_US*" ! -name "*en_GB*" \
+         -delete 2>/dev/null || true && \
+    # Strip debug symbols from all binaries
+    find program -type f -name "*.so*" -exec strip --strip-unneeded {} \; 2>/dev/null || true && \
+    find program -type f -executable -exec strip --strip-unneeded {} \; 2>/dev/null || true && \
+    echo "Writer-only cleanup complete"
+
+# Size report
+RUN echo "=== LibreOffice Size Report ===" && \
+    du -sh /install/opt/lokit && \
+    du -sh /install/opt/lokit/program 2>/dev/null || true && \
+    du -sh /install/opt/lokit/share 2>/dev/null || true
+
+# =============================================================================
+# STAGE 3: Build Collabora Online with White-Labeling
+# =============================================================================
+FROM locore AS builder
+
+ARG COOL_VERSION=distro/collabora/co-24.04
+ARG BRAND_NAME="TeamSync Document"
+
+WORKDIR /build
+
+# Clone Collabora Online source
+RUN echo "Cloning Collabora Online ${COOL_VERSION}..." && \
+    git clone --depth 1 --branch ${COOL_VERSION} \
+    https://github.com/CollaboraOnline/online.git
+
+# Copy branding assets
+COPY docker/branding/document/ /build/branding/
+COPY docker/branding/LICENSE_NOTICE.txt /build/branding/
+
+# Copy and run white-label script
+COPY docker/scripts/white-label.sh /build/white-label.sh
+RUN chmod +x /build/white-label.sh && \
+    /build/white-label.sh /build/online /build/branding
+
+# Replace logo files
+RUN if [ -f /build/branding/images/logo.svg ]; then \
+        find /build/online/browser -type f -name "collabora-logo*.svg" \
+            -exec cp /build/branding/images/logo.svg {} \; 2>/dev/null || true; \
+        find /build/online/browser -type f -name "loleaflet-logo*.svg" \
+            -exec cp /build/branding/images/logo.svg {} \; 2>/dev/null || true; \
+    fi
+
+# Apply custom CSS
+RUN if [ -f /build/branding/css/brand-colors.css ]; then \
+        cat /build/branding/css/brand-colors.css >> \
+            /build/online/browser/src/control/Control.UIManager.css 2>/dev/null || true; \
+    fi
+
+# Build browser assets
+WORKDIR /build/online/browser
+RUN npm install
+
+# Configure and build coolwsd
+WORKDIR /build/online
+RUN ./autogen.sh
+
+RUN ./configure \
+    --prefix=/opt/cool \
+    --with-lokit-path=/install/opt/lokit/include \
+    --with-lo-path=/install/opt/lokit \
+    --enable-silent-rules \
+    --disable-setcap \
+    --disable-ssl
+
+RUN make -j$(nproc)
+RUN make DESTDIR=/coolinstall install
+
+# Create systemplate with lokit inside
+RUN echo "Etc/UTC" > /etc/timezone && \
+    ln -sf /usr/share/zoneinfo/Etc/UTC /etc/localtime && \
+    mkdir -p /coolinstall/opt/cool/systemplate /coolinstall/opt/cool/child-roots && \
+    ./coolwsd-systemplate-setup /coolinstall/opt/cool/systemplate /install/opt/lokit || true
+
+# Ensure lokit is inside systemplate (required for chroot jails)
+RUN mkdir -p /coolinstall/opt/cool/systemplate/opt && \
+    cp -a /install/opt/lokit /coolinstall/opt/cool/systemplate/opt/lokit && \
+    echo "Systemplate with lokit size:" && \
+    du -sh /coolinstall/opt/cool/systemplate
+
+# Strip coolwsd binaries
+RUN find /coolinstall/opt/cool/bin -type f -executable \
+    -exec strip --strip-unneeded {} \; 2>/dev/null || true
+
+# =============================================================================
+# STAGE 4: Runtime Image (Minimal Production)
+# =============================================================================
+FROM --platform=linux/amd64 ubuntu:22.04 AS runtime
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TEAMSYNC_PRODUCT="document"
+
+LABEL maintainer="TeamSync Document"
+LABEL description="TeamSync Document - Writer-only optimized build from source"
+LABEL org.opencontainers.image.licenses="MPL-2.0"
+LABEL teamsync.product="document"
+LABEL teamsync.filetypes="docx,doc,odt,rtf,txt"
+LABEL teamsync.variant="writer-optimized"
+LABEL teamsync.build="source"
+
+# Install MINIMAL runtime dependencies only
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Capabilities
+    libcap2 \
+    libcap2-bin \
+    # Core libraries
+    libpng16-16 \
+    libssl3 \
+    libpam0g \
+    libzstd1 \
+    # Poco runtime libraries
+    libpocofoundation80 \
+    libpoconet80 \
+    libpoconetssl80 \
+    libpococrypto80 \
+    libpocoutil80 \
+    libpocoxml80 \
+    libpocojson80 \
+    # Network
+    libcurl4 \
+    libnss3 \
+    libnspr4 \
+    # XML and text processing
+    libicu70 \
+    libxml2 \
+    libxslt1.1 \
+    # Font and text rendering
+    libhunspell-1.7-0 \
+    libgraphite2-3 \
+    libharfbuzz0b \
+    libfreetype6 \
+    libfontconfig1 \
+    # X11 libs (required by LOKit even headless)
+    libx11-6 \
+    libxrender1 \
+    libxext6 \
+    # Image libraries
+    libjpeg62 \
+    libtiff5 \
+    libwebp7 \
+    # Document format libraries
+    libabw-0.1-1 \
+    libcdr-0.1-1 \
+    libcmis-0.6-6 \
+    libe-book-0.1-1 \
+    libepubgen-0.1-1 \
+    libfreehand-0.1-1 \
+    liblangtag1 \
+    libmspub-0.1-1 \
+    libmwaw-0.3-3 \
+    libodfgen-0.1-1 \
+    liborcus-0.17-0 \
+    libpagemaker-0.0-0 \
+    libqxp-0.0-0 \
+    librevenge-0.0-0 \
+    libstaroffice-0.0-0 \
+    libvisio-0.1-1 \
+    libwpd-0.10-10 \
+    libwpg-0.3-3 \
+    libwps-0.4-4 \
+    libzmf-0.0-0 \
+    # Utilities
+    ca-certificates \
+    curl \
+    # Fonts
+    fontconfig \
+    fonts-liberation \
+    # Spell checking (English only)
+    hunspell \
+    hunspell-en-us \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /usr/share/doc/* /usr/share/man/* /usr/share/info/*
+
+# Create cool user
+RUN useradd -r -M -d /opt/cool -s /bin/false cool
+
+# Create directory structure
+RUN mkdir -p \
+    /opt/cool/systemplate \
+    /opt/cool/child-roots \
+    /opt/cool/browser \
+    /opt/lokit \
+    /etc/coolwsd \
+    /var/log/coolwsd \
+    /var/cache/coolwsd \
+    /tmp/coolwsd
+
+# Copy LibreOffice (Writer-only optimized)
+COPY --from=builder /install/opt/lokit /opt/lokit
+
+# Copy Collabora Online
+COPY --from=builder /coolinstall/opt/cool/bin /opt/cool/bin
+COPY --from=builder /coolinstall/opt/cool/share /opt/cool/share
+COPY --from=builder /coolinstall/opt/cool/child-roots /opt/cool/child-roots
+COPY --from=builder /coolinstall/opt/cool/systemplate /opt/cool/systemplate
+COPY --from=builder /build/online/coolwsd.xml /etc/coolwsd/coolwsd.xml
+
+# Copy LICENSE notice
+COPY docker/branding/LICENSE_NOTICE.txt /opt/cool/LICENSE_NOTICE.txt
+
+# Setup symlinks and permissions
+RUN ln -sf /opt/cool/share/coolwsd/browser /opt/cool/bin/browser && \
+    ln -sf /opt/cool/share/coolwsd/discovery.xml /opt/cool/bin/discovery.xml && \
+    ln -sf /opt/cool/share/coolwsd/favicon.ico /opt/cool/bin/favicon.ico && \
+    ln -sf /opt/cool/systemplate /opt/cool/bin/systemplate && \
+    mkdir -p /opt/cool/bin/jails && \
+    chown -R cool:cool /opt/cool /var/log/coolwsd /var/cache/coolwsd /tmp/coolwsd && \
+    chmod 755 /opt/cool/bin/* && \
+    (setcap cap_fowner,cap_chown,cap_mknod,cap_sys_chroot=ep /opt/cool/bin/coolforkit-caps 2>/dev/null || \
+     setcap cap_fowner,cap_chown,cap_mknod,cap_sys_chroot=ep /opt/cool/bin/coolforkit-ns 2>/dev/null || true)
+
+# Copy entrypoint script
+COPY docker/scripts/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+EXPOSE 9980
+
+# Healthcheck uses PORT env var if set (for Railway/Render), otherwise 9980
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=5 \
+    CMD curl -sf http://localhost:${PORT:-9980}/hosting/discovery > /dev/null || exit 1
+
+WORKDIR /opt/cool
+
+ENTRYPOINT ["/entrypoint.sh"]

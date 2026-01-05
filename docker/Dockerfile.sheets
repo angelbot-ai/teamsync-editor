@@ -269,8 +269,9 @@ RUN chmod +x /entrypoint.sh
 
 EXPOSE 9980
 
+# Healthcheck uses PORT env var if set (for Railway/Render), otherwise 9980
 HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=5 \
-    CMD curl -sf http://localhost:9980/hosting/discovery > /dev/null || exit 1
+    CMD curl -sf http://localhost:${PORT:-9980}/hosting/discovery > /dev/null || exit 1
 
 WORKDIR /opt/cool
 

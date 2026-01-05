@@ -23,7 +23,7 @@ FROM ${SOURCE_IMAGE} AS source
 # =============================================================================
 # Stage 2: Minimal runtime
 # =============================================================================
-FROM ubuntu:22.04 AS minimal
+FROM --platform=linux/amd64 ubuntu:22.04 AS minimal
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TEAMSYNC_PRODUCT="document"
@@ -78,15 +78,11 @@ COPY --from=source /opt/cool/bin /opt/cool/bin
 # Copy browser assets (required for UI)
 COPY --from=source /opt/cool/share/coolwsd /opt/cool/share/coolwsd
 
-# Copy LibreOffice (the core component)
-COPY --from=source /opt/lokit /opt/lokit
+# Copy systemplate with lokit inside (required for chroot jails)
+COPY --from=source /opt/cool/systemplate /opt/cool/systemplate
 
 # Copy config
 COPY --from=source /etc/coolwsd/coolwsd.xml /etc/coolwsd/coolwsd.xml
-
-# Create minimal systemplate with symlink to LibreOffice
-# This avoids duplicating LibreOffice files
-RUN ln -sf /opt/lokit /opt/cool/systemplate/opt/lokit
 
 # Setup symlinks and permissions
 RUN ln -sf /opt/cool/share/coolwsd/browser /opt/cool/bin/browser && \
@@ -105,8 +101,9 @@ RUN chmod +x /entrypoint.sh
 
 EXPOSE 9980
 
+# Healthcheck uses PORT env var if set (for Railway/Render), otherwise 9980
 HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=5 \
-    CMD curl -sf http://localhost:9980/hosting/discovery > /dev/null || exit 1
+    CMD curl -sf http://localhost:${PORT:-9980}/hosting/discovery > /dev/null || exit 1
 
 WORKDIR /opt/cool
 

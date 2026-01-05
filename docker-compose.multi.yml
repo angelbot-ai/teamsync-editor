@@ -40,8 +40,10 @@ services:
       - SYS_CHROOT
       - FOWNER
       - CHOWN
+      - SYS_ADMIN
     security_opt:
       - seccomp:unconfined
+      - apparmor:unconfined
     networks:
       - teamsync-network
     healthcheck:
@@ -76,8 +78,10 @@ services:
       - SYS_CHROOT
       - FOWNER
       - CHOWN
+      - SYS_ADMIN
     security_opt:
       - seccomp:unconfined
+      - apparmor:unconfined
     networks:
       - teamsync-network
     healthcheck:
@@ -111,8 +115,10 @@ services:
       - SYS_CHROOT
       - FOWNER
       - CHOWN
+      - SYS_ADMIN
     security_opt:
       - seccomp:unconfined
+      - apparmor:unconfined
     networks:
       - teamsync-network
     healthcheck:

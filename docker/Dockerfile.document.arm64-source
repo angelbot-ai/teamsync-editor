@@ -1,9 +1,10 @@
 # =============================================================================
-# TeamSync Document - Production-Optimized Word Document Editor
+# TeamSync Document - ARM64 Production-Optimized Full Source Build
 # =============================================================================
 #
 # Handles: .docx, .doc, .odt, .rtf, .txt
-# Optimized for: High performance, millions of users, minimal image size
+# Platform: linux/arm64 (Apple Silicon, ARM servers)
+# Builds LibreOffice and Collabora from source for ARM64
 # License: MPL 2.0 Compliant
 #
 # Production optimizations based on:
@@ -16,43 +17,111 @@
 # - 50MB RAM per user + 1GB system overhead
 # - < 100ms document load time on warm start
 #
+# NOTE: This build takes 3-5 hours due to LibreOffice compilation from source
 # =============================================================================
 
 # =============================================================================
 # STAGE 1: Builder Base - Install build dependencies (cached layer)
 # =============================================================================
-FROM --platform=linux/amd64 ubuntu:22.04 AS builder-base
+FROM --platform=linux/arm64 ubuntu:22.04 AS builder-base
 
 ENV DEBIAN_FRONTEND=noninteractive \
     LANG=C.UTF-8 \
     LC_ALL=C.UTF-8
 
-# Install build dependencies in a single layer for caching
+# Install build dependencies for LibreOffice compilation
 # Sorted alphabetically for maintainability and cache optimization
 RUN apt-get update && apt-get install -y --no-install-recommends \
     autoconf \
     automake \
+    bison \
     build-essential \
     ca-certificates \
+    ccache \
+    cmake \
     cpio \
     curl \
+    doxygen \
+    flex \
     fontconfig \
+    fonts-liberation \
+    fonts-opensymbol \
     git \
+    gperf \
+    graphviz \
+    libabw-dev \
+    libatk1.0-dev \
+    libboost-all-dev \
+    libcairo2-dev \
     libcap-dev \
     libcap2-bin \
+    libcdr-dev \
+    libclucene-dev \
+    libcmis-dev \
     libcppunit-dev \
+    libcurl4-openssl-dev \
+    libe-book-dev \
+    libepoxy-dev \
+    libetonyek-dev \
+    libexpat1-dev \
+    libfontconfig1-dev \
+    libfreehand-dev \
+    libfreetype-dev \
+    libglib2.0-dev \
+    libgraphite2-dev \
+    libgtk-3-dev \
+    libharfbuzz-dev \
+    libhunspell-dev \
+    libhyphen-dev \
+    libicu-dev \
+    libjpeg-dev \
+    liblangtag-dev \
+    liblcms2-dev \
+    libmspub-dev \
+    libmwaw-dev \
+    libmythes-dev \
+    libnss3-dev \
+    libnspr4-dev \
+    libnumbertext-dev \
+    liborcus-dev \
+    libpagemaker-dev \
     libpam-dev \
+    libpango1.0-dev \
+    libpixman-1-dev \
     libpng-dev \
     libpoco-dev \
+    libqxp-dev \
+    librevenge-dev \
     libssl-dev \
+    libstaroffice-dev \
     libtool \
+    libvisio-dev \
+    libwpd-dev \
+    libwpg-dev \
+    libwps-dev \
+    libx11-dev \
+    libxcomposite-dev \
+    libxcursor-dev \
+    libxext-dev \
+    libxinerama-dev \
+    libxml2-dev \
+    libxmlsec1-dev \
+    libxrandr-dev \
+    libxrender-dev \
+    libxslt1-dev \
+    libxt-dev \
+    libzmf-dev \
     libzstd-dev \
     pkg-config \
     python3 \
+    python3-dev \
     python3-lxml \
     python3-polib \
     rsync \
+    unzip \
     wget \
+    xz-utils \
+    zip \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # Install Node.js 20 LTS (latest LTS for better performance and security)
@@ -61,26 +130,136 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && npm cache clean --force \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
+# Setup ccache for faster rebuilds
+ENV CCACHE_DIR=/ccache \
+    PATH="/usr/lib/ccache:$PATH"
+RUN mkdir -p /ccache && chmod 777 /ccache
+
 WORKDIR /build
 
 # =============================================================================
-# STAGE 2: LibreOffice Core - Download and prepare pre-built assets
+# STAGE 2: Build LibreOffice Core from Source (Writer-optimized)
 # =============================================================================
 FROM builder-base AS locore
 
-ARG LO_CORE_VERSION=24.04
+ARG LO_VERSION=libreoffice-24-2-7
+ENV LO_BUILD_DIR=/build/libreoffice
 
 WORKDIR /build
 
-# Download and extract in single layer, then clean up immediately
-RUN echo "==> Downloading LibreOffice core assets (v${LO_CORE_VERSION})..." \
-    && wget -q --show-progress \
-       https://github.com/CollaboraOnline/online/releases/download/for-code-assets/core-co-${LO_CORE_VERSION}-assets.tar.gz \
-       -O core-assets.tar.gz \
-    && echo "==> Extracting assets..." \
-    && tar -xzf core-assets.tar.gz \
-    && rm -f core-assets.tar.gz \
-    && echo "==> Core assets ready"
+# Clone LibreOffice core (shallow clone to save time)
+RUN echo "==> Cloning LibreOffice core (v${LO_VERSION})..." \
+    && git clone --depth 1 --single-branch --branch ${LO_VERSION} \
+       https://github.com/LibreOffice/core.git libreoffice
+
+WORKDIR ${LO_BUILD_DIR}
+
+# Configure LibreOffice - optimized for headless server use
+# Disable as many components as possible for smaller/faster build
+RUN echo "==> Configuring LibreOffice build..." \
+    && ./autogen.sh \
+    --prefix=/opt/lokit \
+    --with-vendor="TeamSync" \
+    --with-package-format="" \
+    --disable-odk \
+    --disable-lotuswordpro \
+    --disable-firebird-sdbc \
+    --disable-postgresql-sdbc \
+    --disable-mariadb-sdbc \
+    --disable-gtk3-kde5 \
+    --disable-dbus \
+    --disable-avahi \
+    --disable-gstreamer-1-0 \
+    --disable-cups \
+    --disable-dconf \
+    --disable-gio \
+    --disable-gui \
+    --disable-sdremote \
+    --disable-sdremote-bluetooth \
+    --disable-extension-update \
+    --disable-extensions \
+    --disable-scripting-beanshell \
+    --disable-scripting-javascript \
+    --disable-report-builder \
+    --disable-lpsolve \
+    --disable-coinmp \
+    --disable-pdfium \
+    --disable-pdfimport \
+    --disable-poppler \
+    --disable-skia \
+    --disable-online-update \
+    --disable-ccache \
+    --enable-release-build \
+    --enable-epm \
+    --without-java \
+    --without-junit \
+    --without-doxygen \
+    --without-galleries \
+    --without-helppack-integration \
+    --without-myspell-dicts \
+    --without-fonts \
+    --with-system-curl \
+    --with-system-expat \
+    --with-system-icu \
+    --with-system-libxml \
+    --with-system-openssl \
+    --with-system-zlib \
+    --with-system-libpng \
+    --with-system-jpeg \
+    --with-system-boost \
+    --with-system-harfbuzz \
+    --with-system-nss \
+    --with-system-hunspell \
+    --with-system-cairo \
+    --with-system-freetype \
+    --with-system-fontconfig \
+    --with-system-graphite \
+    --with-system-orcus \
+    --with-system-libcdr \
+    --with-system-libvisio \
+    --with-system-libwpd \
+    --with-system-libwpg \
+    --with-system-libwps \
+    --with-system-libmspub \
+    --with-system-libmwaw \
+    --with-system-libebook \
+    --with-system-libabw \
+    --with-system-libetonyek \
+    --with-system-libfreehand \
+    --with-system-libstaroffice \
+    --with-system-libzmf \
+    --with-system-libpagemaker \
+    --with-system-libqxp \
+    --with-system-libnumbertext \
+    --with-system-liblangtag \
+    --with-system-libcmis \
+    --with-system-librevenge \
+    --with-system-clucene \
+    --with-system-xmlsec \
+    --with-system-epoxy \
+    --with-system-lcms2 \
+    --with-parallelism=$(nproc) 2>&1 | tee /build/configure.log
+
+# Build LibreOffice (this takes 2-4 hours on ARM64)
+RUN echo "==> Building LibreOffice (this will take several hours)..." \
+    && make -j$(nproc) build-nocheck 2>&1 | tee /build/lo-build.log
+
+# Install to a staging directory
+RUN make DESTDIR=/build/lo-install install
+
+# Create the instdir structure needed by Collabora Online
+RUN mkdir -p /build/instdir \
+    && if [ -d /build/lo-install/opt/lokit ]; then \
+           cp -r /build/lo-install/opt/lokit/* /build/instdir/; \
+       elif [ -d ${LO_BUILD_DIR}/instdir ]; then \
+           cp -r ${LO_BUILD_DIR}/instdir/* /build/instdir/; \
+       fi \
+    && echo "==> LibreOffice build complete - instdir size:" \
+    && du -sh /build/instdir
+
+# Create include directory for LOKit headers
+RUN mkdir -p /build/include \
+    && cp -r ${LO_BUILD_DIR}/include/LibreOfficeKit /build/include/
 
 # =============================================================================
 # STAGE 3: Build Collabora Online with Branding & Production Optimizations
@@ -203,7 +382,6 @@ RUN echo "Etc/UTC" > /etc/timezone \
     && ./coolwsd-systemplate-setup /install/opt/cool/systemplate /opt/lokit || true
 
 # Copy lokit into systemplate (REQUIRED for chroot jails to work)
-# This is critical - without this, the jail cannot access LibreOffice
 RUN mkdir -p /install/opt/cool/systemplate/opt \
     && cp -a /opt/lokit /install/opt/cool/systemplate/opt/lokit
 
@@ -221,7 +399,7 @@ RUN echo "=== BUILD SIZE REPORT ===" \
 # =============================================================================
 # STAGE 4: Production Runtime Image (Minimal footprint)
 # =============================================================================
-FROM --platform=linux/amd64 ubuntu:22.04 AS runtime
+FROM --platform=linux/arm64 ubuntu:22.04 AS runtime
 
 # Production environment configuration
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -229,7 +407,6 @@ ENV DEBIAN_FRONTEND=noninteractive \
     LC_ALL=C.UTF-8 \
     TEAMSYNC_PRODUCT="document" \
     # Collabora Online performance tuning defaults
-    # Can be overridden via environment variables at runtime
     MEMPROPORTION=80.0 \
     MAX_CONNECTIONS=100000 \
     MAX_DOCUMENTS=10000 \
@@ -238,13 +415,15 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 # OCI Image Labels for container registries
 LABEL maintainer="TeamSync <support@teamsync.io>" \
-      org.opencontainers.image.title="TeamSync Document" \
-      org.opencontainers.image.description="Production-optimized collaborative word processing for millions of users" \
+      org.opencontainers.image.title="TeamSync Document (ARM64)" \
+      org.opencontainers.image.description="Production-optimized collaborative word processing for ARM64 - built from source" \
       org.opencontainers.image.licenses="MPL-2.0" \
       org.opencontainers.image.vendor="TeamSync" \
       org.opencontainers.image.source="https://github.com/angelbot-ai/teamsync-editor" \
       teamsync.product="document" \
       teamsync.filetypes="docx,doc,odt,rtf,txt" \
+      teamsync.architecture="arm64" \
+      teamsync.build="source" \
       teamsync.version="1.0.0"
 
 # Install minimal runtime dependencies in single optimized layer
@@ -271,9 +450,56 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # Font rendering
     fontconfig \
     fonts-liberation \
-    # Spell checking (English only for initial release)
+    # Spell checking (English only)
     hunspell \
     hunspell-en-us \
+    # LibreOffice runtime dependencies (ARM64)
+    libfreetype6 \
+    libfontconfig1 \
+    libharfbuzz0b \
+    libicu70 \
+    libexpat1 \
+    libxml2 \
+    libxslt1.1 \
+    libnss3 \
+    libnspr4 \
+    libcairo2 \
+    libpixman-1-0 \
+    libglib2.0-0 \
+    libatk1.0-0 \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libx11-6 \
+    libxext6 \
+    libxrender1 \
+    libepoxy0 \
+    liblcms2-2 \
+    libhunspell-1.7-0 \
+    libboost-filesystem1.74.0 \
+    libboost-locale1.74.0 \
+    libgraphite2-3 \
+    liborcus-0.17-0 \
+    libcdr-0.1-1 \
+    libvisio-0.1-1 \
+    libwpd-0.10-10 \
+    libwpg-0.3-3 \
+    libwps-0.4-4 \
+    libmspub-0.1-1 \
+    libmwaw-0.3-22 \
+    libe-book-0.1-1 \
+    libabw-0.1-1 \
+    libetonyek-0.1-1 \
+    libfreehand-0.1-1 \
+    libstaroffice-0.0-0 \
+    libzmf-0.0-0 \
+    libpagemaker-0.0-0 \
+    libqxp-0.0-0 \
+    libnumbertext-1.0-1 \
+    liblangtag1 \
+    libcmis-0.6-6 \
+    librevenge-0.0-0 \
+    libclucene-core1v5 \
+    libxmlsec1-openssl \
     && apt-get clean \
     && rm -rf \
         /var/lib/apt/lists/* \

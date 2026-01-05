@@ -441,7 +441,7 @@ app.get('/api/health', async (req, res) => {
                 try {
                     console.log(`[Health] Checking ${name} at ${url}/hosting/discovery`);
                     const response = await fetch(`${url}/hosting/discovery`, {
-                        signal: AbortSignal.timeout(10000)
+                        signal: AbortSignal.timeout(60000)
                     });
                     const status = response.ok ? 'healthy' : 'not reachable';
                     console.log(`[Health] ${name}: ${status} (HTTP ${response.status})`);
