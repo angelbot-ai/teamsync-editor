@@ -275,6 +275,50 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # Spell checking (English only for initial release)
     hunspell \
     hunspell-en-us \
+    # LibreOffice runtime dependencies (Ubuntu 24.04)
+    libfreetype6 \
+    libfontconfig1 \
+    libharfbuzz0b \
+    libicu74 \
+    libexpat1 \
+    libxml2 \
+    libxslt1.1 \
+    libnss3 \
+    libnspr4 \
+    libcairo2 \
+    libpixman-1-0 \
+    libglib2.0-0t64 \
+    libatk1.0-0t64 \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libx11-6 \
+    libxext6 \
+    libxrender1 \
+    libepoxy0 \
+    liblcms2-2 \
+    libhunspell-1.7-0 \
+    libboost-filesystem1.83.0 \
+    libboost-locale1.83.0 \
+    libgraphite2-3 \
+    liborcus-0.18-0 \
+    libcdr-0.1-1 \
+    libvisio-0.1-1 \
+    libwpd-0.10-10 \
+    libwpg-0.3-3 \
+    libwps-0.4-4 \
+    libmspub-0.1-1 \
+    libe-book-0.1-1 \
+    libabw-0.1-1 \
+    libetonyek-0.1-1 \
+    libfreehand-0.1-1 \
+    libstaroffice-0.0-0 \
+    libzmf-0.0-0 \
+    libpagemaker-0.0-0 \
+    libqxp-0.0-0 \
+    liblangtag1 \
+    librevenge-0.0-0 \
+    libclucene-core1v5 \
+    libxmlsec1-openssl \
     && apt-get clean \
     && rm -rf \
         /var/lib/apt/lists/* \
