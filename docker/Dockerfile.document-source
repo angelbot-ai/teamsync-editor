@@ -246,20 +246,14 @@ RUN echo "==> Configuring LibreOffice build..." \
     --with-system-lcms2 \
     --with-parallelism=$(nproc) 2>&1 | tee /build/configure.log
 
-# Build LibreOffice (this takes 2-4 hours on ARM64)
+# Build LibreOffice (this takes 2-4 hours)
 RUN echo "==> Building LibreOffice (this will take several hours)..." \
     && make -j$(nproc) build-nocheck 2>&1 | tee /build/lo-build.log
 
-# Install to a staging directory
-RUN make DESTDIR=/build/lo-install install
-
-# Create the instdir structure needed by Collabora Online
+# LibreOffice creates instdir directly - copy it to our staging area
+# Note: LibreOffice doesn't have a traditional "make install" - it builds to instdir
 RUN mkdir -p /build/instdir \
-    && if [ -d /build/lo-install/opt/lokit ]; then \
-           cp -r /build/lo-install/opt/lokit/* /build/instdir/; \
-       elif [ -d ${LO_BUILD_DIR}/instdir ]; then \
-           cp -r ${LO_BUILD_DIR}/instdir/* /build/instdir/; \
-       fi \
+    && cp -r ${LO_BUILD_DIR}/instdir/* /build/instdir/ \
     && echo "==> LibreOffice build complete - instdir size:" \
     && du -sh /build/instdir
 
