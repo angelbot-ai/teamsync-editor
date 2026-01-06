@@ -138,78 +138,10 @@ jobs:
           SIZE=$(docker images ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/teamsync-${{ matrix.product }}:latest --format "{{.Size}}")
           echo "| teamsync-${{ matrix.product }} | $SIZE |" >> $GITHUB_STEP_SUMMARY
 
-  # Build document-source on larger runner (try paid runner, fallback to free with cleanup)
-  build-source-large:
+  # Build document-source with aggressive cleanup (LibreOffice source build needs ~50GB)
+  build-source:
     needs: prepare
     if: needs.prepare.outputs.build-source == 'true'
-    runs-on: ubuntu-latest-16-cores
-    timeout-minutes: 480
-    permissions:
-      contents: read
-      packages: write
-    continue-on-error: true
-    outputs:
-      success: ${{ steps.build.outcome == 'success' }}
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Check disk space
-        run: |
-          echo "Disk space on larger runner:"
-          df -h
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to GitHub Container Registry
-        if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/teamsync-document-source
-          tags: |
-            type=raw,value=latest
-            type=sha,prefix=
-
-      - name: Build and push TeamSync document-source
-        id: build
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: docker/Dockerfile.document-source
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          no-cache: true
-          platforms: linux/amd64
-          provenance: false
-
-      - name: Image size report
-        if: steps.build.outcome == 'success' && github.event_name != 'pull_request'
-        run: |
-          echo "### Image Size Report for document-source" >> $GITHUB_STEP_SUMMARY
-          echo "| Image | Size | Runner |" >> $GITHUB_STEP_SUMMARY
-          echo "|-------|------|--------|" >> $GITHUB_STEP_SUMMARY
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/teamsync-document-source:latest
-          SIZE=$(docker images ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/teamsync-document-source:latest --format "{{.Size}}")
-          echo "| teamsync-document-source | $SIZE | ubuntu-latest-16-cores |" >> $GITHUB_STEP_SUMMARY
-
-  # Fallback: Build document-source on free runner with aggressive cleanup
-  build-source-fallback:
-    needs: [prepare, build-source-large]
-    if: needs.prepare.outputs.build-source == 'true' && needs.build-source-large.outputs.success != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 480
     permissions:
@@ -302,7 +234,7 @@ jobs:
 
   # Compare image sizes after all builds complete
   compare-sizes:
-    needs: [build-packages, build-source-large, build-source-fallback]
+    needs: [build-packages, build-source]
     if: always() && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
