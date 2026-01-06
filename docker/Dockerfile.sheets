@@ -15,50 +15,9 @@
 # =============================================================================
 
 # =============================================================================
-# STAGE 1: Branding Builder - Prepare custom branding assets
+# Single Stage Build - Install packages then apply branding
 # =============================================================================
-FROM debian:bookworm-slim AS branding-builder
-
-ENV DEBIAN_FRONTEND=noninteractive
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
-    make \
-    nodejs \
-    npm \
-    python3 \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /build
-
-# Clone Collabora Online source for branding customization
-ARG COOL_VERSION=cp-24.04.9-2
-RUN git clone --depth 1 --single-branch --branch ${COOL_VERSION} \
-    https://github.com/CollaboraOnline/online.git
-
-# Copy branding assets
-COPY docker/branding/sheets/ /build/branding/
-COPY docker/branding/LICENSE_NOTICE.txt /build/branding/
-
-# Copy and execute white-label script
-COPY docker/scripts/white-label.sh /build/white-label.sh
-RUN chmod +x /build/white-label.sh \
-    && /build/white-label.sh /build/online /build/branding
-
-# Replace logo files if provided
-RUN if [ -f /build/branding/images/logo.svg ]; then \
-        find /build/online/browser -type f \( -name "collabora-logo*.svg" -o -name "loleaflet-logo*.svg" \) \
-            -exec cp /build/branding/images/logo.svg {} \; 2>/dev/null || true; \
-    fi
-
-# Build browser assets with branding
-WORKDIR /build/online/browser
-RUN npm install --no-audit && make
-
-# =============================================================================
-# STAGE 2: Production Runtime - Install from official packages
-# =============================================================================
-FROM debian:bookworm-slim AS runtime
+FROM debian:bookworm-slim
 
 # Production environment configuration
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -83,9 +42,7 @@ LABEL maintainer="TeamSync <support@teamsync.io>" \
       teamsync.filetypes="xlsx,xls,ods,csv" \
       teamsync.version="1.0.0"
 
-# Install Collabora Online from official packages
-# This includes coolwsd-deprecated which provides coolforkit-caps
-ARG COOL_REPO_TYPE=CODE
+# Install base dependencies and Collabora Online packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
     apt-transport-https \
     ca-certificates \
@@ -99,11 +56,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libcap2-bin \
     libnss-wrapper \
     locales \
+    sed \
     tzdata \
     && rm -rf /var/lib/apt/lists/*
 
 # Add Collabora repository and install packages
-# Using CODE (Community) repository - 24.04 branch for stability
+# Using CODE (Community) repository - main branch for latest stable
 RUN curl -fsSL https://www.collaboraoffice.com/downloads/gpg/collaboraonline-release-keyring.gpg \
         -o /usr/share/keyrings/collaboraonline-release-keyring.gpg \
     && echo "deb [signed-by=/usr/share/keyrings/collaboraonline-release-keyring.gpg] https://www.collaboraoffice.com/repos/CollaboraOnline/CODE-deb ./" \
@@ -122,10 +80,20 @@ RUN fc-cache -fv
 # Set proper permissions on config
 RUN chmod 644 /etc/coolwsd/coolwsd.xml
 
-# Copy branded browser assets from builder stage
-COPY --from=branding-builder /build/online/browser/dist/ /usr/share/coolwsd/browser/dist/
+# =============================================================================
+# Apply TeamSync Branding to installed browser assets
+# =============================================================================
+# Copy branding assets and script
+COPY docker/branding/sheets/ /tmp/branding/
+COPY docker/branding/LICENSE_NOTICE.txt /tmp/branding/
+COPY docker/scripts/apply-branding.sh /tmp/apply-branding.sh
 
-# Copy license notice
+# Apply branding modifications to the installed Collabora assets
+RUN chmod +x /tmp/apply-branding.sh \
+    && /tmp/apply-branding.sh /usr/share/coolwsd /tmp/branding "TeamSync Sheets" \
+    && rm -rf /tmp/branding /tmp/apply-branding.sh
+
+# Copy license notice to final location
 COPY docker/branding/LICENSE_NOTICE.txt /opt/cool/LICENSE_NOTICE.txt
 
 # Copy entrypoint script (uses official paths)
