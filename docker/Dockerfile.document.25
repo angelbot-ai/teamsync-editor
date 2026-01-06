@@ -89,11 +89,18 @@ RUN if [ -f /build/branding/images/logo.svg ]; then \
 WORKDIR /build/online/browser
 RUN npm install --no-audit
 
+# Find where LibreOfficeKit headers are installed by the Collabora packages
+# They should be in /opt/collaboraoffice/include or the coolwsd package may provide them
+RUN find /opt -name "LibreOfficeKit.h" 2>/dev/null || echo "Header not in /opt" \
+    && find /usr -name "LibreOfficeKit.h" 2>/dev/null || echo "Header not in /usr" \
+    && ls -la /opt/collaboraoffice/ 2>/dev/null || echo "No /opt/collaboraoffice" \
+    && ls -la /opt/cool/ 2>/dev/null || echo "No /opt/cool"
+
 # Build coolwsd from source (this also builds browser assets via configure/make)
 WORKDIR /build/online
 RUN ./autogen.sh && ./configure \
     --prefix=/opt/cool \
-    --with-lokit-path=/opt/cool/include \
+    --with-lokit-path=/opt/collaboraoffice/include \
     --with-lo-path=/opt/collaboraoffice \
     --disable-setcap \
     --enable-silent-rules
