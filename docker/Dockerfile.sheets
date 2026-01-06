@@ -105,7 +105,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Using CODE (Community) repository - 24.04 branch for stability
 RUN curl -fsSL https://www.collaboraoffice.com/downloads/gpg/collaboraonline-release-keyring.gpg \
         -o /usr/share/keyrings/collaboraonline-release-keyring.gpg \
-    && echo "deb [signed-by=/usr/share/keyrings/collaboraonline-release-keyring.gpg] https://www.collaboraoffice.com/repos/CollaboraOnline/24.04-CODE/CODE-deb /" \
+    && echo "deb [signed-by=/usr/share/keyrings/collaboraonline-release-keyring.gpg] https://www.collaboraoffice.com/repos/CollaboraOnline/CODE-deb ./" \
         > /etc/apt/sources.list.d/collaboraonline.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
