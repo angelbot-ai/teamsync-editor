@@ -75,12 +75,44 @@ jobs:
         run: |
           echo "Disk space before cleanup:"
           df -h
+          # Standard cleanup
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /opt/ghc
           sudo rm -rf /opt/hostedtoolcache/CodeQL
           sudo docker image prune --all --force
-          echo "Disk space after cleanup:"
+          echo "Disk space after standard cleanup:"
+          df -h
+
+      - name: Aggressive disk cleanup for source builds
+        if: matrix.product == 'document-source'
+        run: |
+          echo "Running aggressive cleanup for LibreOffice source build..."
+          # Remove more cached tools
+          sudo rm -rf /opt/hostedtoolcache
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf /usr/local/.ghcup
+          sudo rm -rf /usr/local/go
+          sudo rm -rf /usr/local/julia*
+          sudo rm -rf /usr/share/swift
+          sudo rm -rf /usr/share/miniconda
+          sudo rm -rf /usr/share/az_*
+          sudo rm -rf /usr/share/gradle*
+          sudo rm -rf /usr/share/sbt
+          sudo rm -rf /opt/microsoft
+          sudo rm -rf /opt/google
+          sudo rm -rf /opt/pipx
+          # Remove large apt packages we don't need
+          sudo apt-get remove -y '^aspnetcore-.*' '^dotnet-.*' 'php.*' '^mongodb-.*' '^mysql-.*' azure-cli google-cloud-cli microsoft-edge-stable google-chrome-stable firefox powershell mono-devel || true
+          sudo apt-get autoremove -y
+          sudo apt-get clean
+          # Clear apt cache
+          sudo rm -rf /var/lib/apt/lists/*
+          sudo rm -rf /var/cache/apt/archives/*
+          # Remove swap file to free space
+          sudo swapoff -a || true
+          sudo rm -f /swapfile || true
+          echo "Disk space after aggressive cleanup:"
           df -h
 
       - name: Set up QEMU
