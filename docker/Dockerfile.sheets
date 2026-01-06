@@ -102,11 +102,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Add Collabora repository and install packages
-# Using CODE (Community) repository for latest stable packages
-RUN curl -fsSL https://collaboraoffice.com/downloads/gpg/collaboraonline-release-keyring.gpg \
+# Using CODE (Community) repository - 24.04 branch for stability
+RUN curl -fsSL https://www.collaboraoffice.com/downloads/gpg/collaboraonline-release-keyring.gpg \
         -o /usr/share/keyrings/collaboraonline-release-keyring.gpg \
-    && echo "deb [signed-by=/usr/share/keyrings/collaboraonline-release-keyring.gpg] \
-        https://www.collaboraoffice.com/repos/CollaboraOnline/CODE/debian bookworm main" \
+    && echo "deb [signed-by=/usr/share/keyrings/collaboraonline-release-keyring.gpg] https://www.collaboraoffice.com/repos/CollaboraOnline/24.04-CODE/CODE-deb /" \
         > /etc/apt/sources.list.d/collaboraonline.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
