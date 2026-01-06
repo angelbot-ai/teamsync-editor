@@ -89,12 +89,24 @@ RUN if [ -f /build/branding/images/logo.svg ]; then \
 WORKDIR /build/online/browser
 RUN npm install --no-audit
 
+# Download LibreOfficeKit headers from LibreOffice core (not included in Collabora packages)
+RUN mkdir -p /build/lokit-headers/LibreOfficeKit \
+    && curl -fsSL https://raw.githubusercontent.com/LibreOffice/core/master/include/LibreOfficeKit/LibreOfficeKit.h \
+        -o /build/lokit-headers/LibreOfficeKit/LibreOfficeKit.h \
+    && curl -fsSL https://raw.githubusercontent.com/LibreOffice/core/master/include/LibreOfficeKit/LibreOfficeKit.hxx \
+        -o /build/lokit-headers/LibreOfficeKit/LibreOfficeKit.hxx \
+    && curl -fsSL https://raw.githubusercontent.com/LibreOffice/core/master/include/LibreOfficeKit/LibreOfficeKitEnums.h \
+        -o /build/lokit-headers/LibreOfficeKit/LibreOfficeKitEnums.h \
+    && curl -fsSL https://raw.githubusercontent.com/LibreOffice/core/master/include/LibreOfficeKit/LibreOfficeKitInit.h \
+        -o /build/lokit-headers/LibreOfficeKit/LibreOfficeKitInit.h \
+    && curl -fsSL https://raw.githubusercontent.com/LibreOffice/core/master/include/LibreOfficeKit/LibreOfficeKitTypes.h \
+        -o /build/lokit-headers/LibreOfficeKit/LibreOfficeKitTypes.h
+
 # Build coolwsd from source (this also builds browser assets via configure/make)
-# LOKit headers are bundled in the online source at bundled/include/
 WORKDIR /build/online
 RUN ./autogen.sh && ./configure \
     --prefix=/opt/cool \
-    --with-lokit-path=/build/online/bundled/include \
+    --with-lokit-path=/build/lokit-headers \
     --with-lo-path=/opt/collaboraoffice \
     --disable-setcap \
     --enable-silent-rules
