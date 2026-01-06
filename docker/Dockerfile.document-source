@@ -170,13 +170,16 @@ WORKDIR ${LO_BUILD_DIR}
 # - --enable-mergelibs (CRITICAL: creates libmergedlo.so required by coolwsd)
 # - Optimizations for headless server deployment
 # - All necessary LOKit/LibreOfficeKit components
-# We add --without-package-format to skip package generation and --without-system-icu
-# for Ubuntu 24.04 compatibility (ICU 74 has breakiterator issues)
+# We add:
+# - --without-package-format: skip package generation
+# - --without-system-icu: Ubuntu 24.04 ICU 74 has breakiterator issues
+# - --with-lang=en-US: English-only (faster build, smaller image, no gettext needed)
 RUN echo "==> Configuring LibreOffice build with CPLinux-LOKit distro..." \
     && ./autogen.sh \
     --with-distro=CPLinux-LOKit \
     --without-package-format \
     --without-system-icu \
+    --with-lang=en-US \
     --with-parallelism=$(nproc) 2>&1 | tee /build/configure.log
 
 # Build LibreOffice (this takes 2-4 hours)
