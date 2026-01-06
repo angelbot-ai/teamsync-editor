@@ -5,6 +5,7 @@
 # Handles: .docx, .doc, .odt, .rtf, .txt
 # Optimized for: High performance, millions of users, minimal image size
 # License: MPL 2.0 Compliant
+# Build: Uses pre-built LibreOffice assets (fast build, ~30-60 minutes)
 #
 # Production optimizations based on:
 # - Docker 2025 best practices (multi-stage, layer caching, minimal base)
@@ -21,7 +22,7 @@
 # =============================================================================
 # STAGE 1: Builder Base - Install build dependencies (cached layer)
 # =============================================================================
-FROM ubuntu:22.04 AS builder-base
+FROM ubuntu:24.04 AS builder-base
 
 ENV DEBIAN_FRONTEND=noninteractive \
     LANG=C.UTF-8 \
@@ -221,7 +222,7 @@ RUN echo "=== BUILD SIZE REPORT ===" \
 # =============================================================================
 # STAGE 4: Production Runtime Image (Minimal footprint)
 # =============================================================================
-FROM ubuntu:22.04 AS runtime
+FROM ubuntu:24.04 AS runtime
 
 # Production environment configuration
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -256,14 +257,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libssl3 \
     libpam0g \
     libzstd1 \
-    # Poco runtime libraries (networking, crypto, XML parsing)
-    libpocofoundation80 \
-    libpoconet80 \
-    libpoconetssl80 \
-    libpococrypto80 \
-    libpocoutil80 \
-    libpocoxml80 \
-    libpocojson80 \
+    # Poco runtime libraries (networking, crypto, XML parsing) - Ubuntu 24.04 uses version 111
+    libpocofoundation111 \
+    libpoconet111 \
+    libpoconetssl111 \
+    libpococrypto111 \
+    libpocoutil111 \
+    libpocoxml111 \
+    libpocojson111 \
     # System utilities
     ca-certificates \
     curl \

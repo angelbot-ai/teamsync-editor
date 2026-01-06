@@ -1,11 +1,16 @@
 # =============================================================================
-# TeamSync Document - ARM64 Production-Optimized Full Source Build
+# TeamSync Document - Full Source Build (Most Optimized)
 # =============================================================================
 #
 # Handles: .docx, .doc, .odt, .rtf, .txt
-# Platform: linux/arm64 (Apple Silicon, ARM servers)
-# Builds LibreOffice and Collabora from source for ARM64
+# Platform: Multi-platform (linux/amd64, linux/arm64)
+# Build: Compiles both LibreOffice and Collabora from source
 # License: MPL 2.0 Compliant
+#
+# This Dockerfile builds LibreOffice from source with aggressive optimizations:
+# - 50+ disabled components (GUI, databases, scripting, etc.)
+# - 30+ system library linkages (reduces binary size)
+# - Writer-only configuration
 #
 # Production optimizations based on:
 # - Docker 2025 best practices (multi-stage, layer caching, minimal base)
@@ -23,7 +28,7 @@
 # =============================================================================
 # STAGE 1: Builder Base - Install build dependencies (cached layer)
 # =============================================================================
-FROM --platform=linux/arm64 ubuntu:24.04 AS builder-base
+FROM ubuntu:24.04 AS builder-base
 
 ENV DEBIAN_FRONTEND=noninteractive \
     LANG=C.UTF-8 \
@@ -400,7 +405,7 @@ RUN echo "=== BUILD SIZE REPORT ===" \
 # =============================================================================
 # STAGE 4: Production Runtime Image (Minimal footprint)
 # =============================================================================
-FROM --platform=linux/arm64 ubuntu:24.04 AS runtime
+FROM ubuntu:24.04 AS runtime
 
 # Production environment configuration
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -416,14 +421,13 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 # OCI Image Labels for container registries
 LABEL maintainer="TeamSync <support@teamsync.io>" \
-      org.opencontainers.image.title="TeamSync Document (ARM64)" \
-      org.opencontainers.image.description="Production-optimized collaborative word processing for ARM64 - built from source" \
+      org.opencontainers.image.title="TeamSync Document (Source Build)" \
+      org.opencontainers.image.description="Production-optimized collaborative word processing - built from source with maximum optimizations" \
       org.opencontainers.image.licenses="MPL-2.0" \
       org.opencontainers.image.vendor="TeamSync" \
       org.opencontainers.image.source="https://github.com/angelbot-ai/teamsync-editor" \
       teamsync.product="document" \
       teamsync.filetypes="docx,doc,odt,rtf,txt" \
-      teamsync.architecture="arm64" \
       teamsync.build="source" \
       teamsync.version="1.0.0"
 
@@ -454,7 +458,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # Spell checking (English only)
     hunspell \
     hunspell-en-us \
-    # LibreOffice runtime dependencies (Ubuntu 24.04 ARM64)
+    # LibreOffice runtime dependencies (Ubuntu 24.04)
     libfreetype6 \
     libfontconfig1 \
     libharfbuzz0b \

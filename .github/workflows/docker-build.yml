@@ -20,17 +20,9 @@ on:
         options:
           - all
           - document
+          - document-source
           - sheets
           - presentation
-      architecture:
-        description: 'Target architecture'
-        required: true
-        default: 'amd64'
-        type: choice
-        options:
-          - amd64
-          - arm64
-          - both
 
 env:
   REGISTRY: ghcr.io
@@ -48,19 +40,26 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             if [ "${{ inputs.image }}" == "all" ]; then
-              echo 'matrix={"include":[{"product":"document"},{"product":"sheets"},{"product":"presentation"}]}' >> $GITHUB_OUTPUT
+              echo 'matrix={"include":[{"product":"document","dockerfile":"Dockerfile.document"},{"product":"document-source","dockerfile":"Dockerfile.document-source"},{"product":"sheets","dockerfile":"Dockerfile.sheets"},{"product":"presentation","dockerfile":"Dockerfile.presentation"}]}' >> $GITHUB_OUTPUT
             else
-              echo 'matrix={"include":[{"product":"${{ inputs.image }}"}]}' >> $GITHUB_OUTPUT
+              PRODUCT="${{ inputs.image }}"
+              if [ "$PRODUCT" == "document-source" ]; then
+                DOCKERFILE="Dockerfile.document-source"
+              else
+                DOCKERFILE="Dockerfile.$PRODUCT"
+              fi
+              echo "matrix={\"include\":[{\"product\":\"$PRODUCT\",\"dockerfile\":\"$DOCKERFILE\"}]}" >> $GITHUB_OUTPUT
             fi
           else
-            echo 'matrix={"include":[{"product":"document"},{"product":"sheets"},{"product":"presentation"}]}' >> $GITHUB_OUTPUT
+            # On push, build all images
+            echo 'matrix={"include":[{"product":"document","dockerfile":"Dockerfile.document"},{"product":"document-source","dockerfile":"Dockerfile.document-source"},{"product":"sheets","dockerfile":"Dockerfile.sheets"},{"product":"presentation","dockerfile":"Dockerfile.presentation"}]}' >> $GITHUB_OUTPUT
           fi
 
-  # Build AMD64 images (uses pre-built LibreOffice assets - fast)
-  build-amd64:
+  # Build images (platform independent)
+  build:
     needs: prepare
     runs-on: ubuntu-latest
-    timeout-minutes: 360
+    timeout-minutes: 480
     permissions:
       contents: read
       packages: write
@@ -106,111 +105,37 @@ jobs:
           tags: |
             type=raw,value=latest
             type=sha,prefix=
-            type=raw,value=amd64-latest
 
-      - name: Build and push AMD64 TeamSync ${{ matrix.product }}
+      - name: Build and push TeamSync ${{ matrix.product }}
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: docker/Dockerfile.${{ matrix.product }}
+          file: docker/${{ matrix.dockerfile }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=${{ matrix.product }}-amd64
-          cache-to: type=gha,mode=max,scope=${{ matrix.product }}-amd64
+          cache-from: type=gha,scope=${{ matrix.product }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.product }}
           platforms: linux/amd64
           provenance: false
 
       - name: Image size report
         if: github.event_name != 'pull_request'
         run: |
-          echo "### AMD64 Image Size Report" >> $GITHUB_STEP_SUMMARY
+          echo "### Image Size Report for ${{ matrix.product }}" >> $GITHUB_STEP_SUMMARY
           echo "| Image | Size |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|------|" >> $GITHUB_STEP_SUMMARY
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/teamsync-${{ matrix.product }}:amd64-latest
-          SIZE=$(docker images ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/teamsync-${{ matrix.product }}:amd64-latest --format "{{.Size}}")
-          echo "| teamsync-${{ matrix.product }} (amd64) | $SIZE |" >> $GITHUB_STEP_SUMMARY
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/teamsync-${{ matrix.product }}:latest
+          SIZE=$(docker images ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/teamsync-${{ matrix.product }}:latest --format "{{.Size}}")
+          echo "| teamsync-${{ matrix.product }} | $SIZE |" >> $GITHUB_STEP_SUMMARY
 
-  # Build ARM64 images (full source build from LibreOffice - slow)
-  build-arm64:
-    needs: prepare
-    runs-on: ubuntu-24.04-arm
-    timeout-minutes: 480
-    permissions:
-      contents: read
-      packages: write
-    if: |
-      github.event_name == 'workflow_dispatch' &&
-      (inputs.architecture == 'arm64' || inputs.architecture == 'both')
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Free up disk space
-        run: |
-          echo "Disk space before cleanup:"
-          df -h
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          sudo docker image prune --all --force
-          echo "Disk space after cleanup:"
-          df -h
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push ARM64 TeamSync ${{ matrix.product }}
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: docker/Dockerfile.${{ matrix.product }}.arm64-source
-          push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/teamsync-${{ matrix.product }}:arm64-latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/teamsync-${{ matrix.product }}:arm64-${{ github.sha }}
-          cache-from: type=gha,scope=${{ matrix.product }}-arm64
-          cache-to: type=gha,mode=max,scope=${{ matrix.product }}-arm64
-          platforms: linux/arm64
-          provenance: false
-
-      - name: Image size report
-        run: |
-          echo "### ARM64 Image Size Report" >> $GITHUB_STEP_SUMMARY
-          echo "| Image | Size |" >> $GITHUB_STEP_SUMMARY
-          echo "|-------|------|" >> $GITHUB_STEP_SUMMARY
-          SIZE=$(docker images ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/teamsync-${{ matrix.product }}:arm64-latest --format "{{.Size}}")
-          echo "| teamsync-${{ matrix.product }} (arm64) | $SIZE |" >> $GITHUB_STEP_SUMMARY
-
-  # Create multi-platform manifest (combines amd64 and arm64)
-  create-manifest:
-    needs: [prepare, build-amd64, build-arm64]
+  # Compare image sizes after all builds complete
+  compare-sizes:
+    needs: build
     runs-on: ubuntu-latest
-    if: |
-      always() &&
-      github.event_name == 'workflow_dispatch' &&
-      inputs.architecture == 'both' &&
-      needs.build-amd64.result == 'success' &&
-      needs.build-arm64.result == 'success'
+    if: github.event_name != 'pull_request'
     permissions:
-      contents: read
-      packages: write
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
-
+      packages: read
     steps:
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
@@ -219,25 +144,26 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create multi-platform manifest
+      - name: Compare image sizes
         run: |
-          # Create manifest for :latest tag
-          docker manifest create ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/teamsync-${{ matrix.product }}:latest \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/teamsync-${{ matrix.product }}:amd64-latest \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/teamsync-${{ matrix.product }}:arm64-latest
+          echo "## Docker Image Size Comparison" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Image | Size | Build Type |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|------|------------|" >> $GITHUB_STEP_SUMMARY
 
-          # Annotate with architecture info
-          docker manifest annotate ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/teamsync-${{ matrix.product }}:latest \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/teamsync-${{ matrix.product }}:amd64-latest \
-            --os linux --arch amd64
+          # Pull and report sizes for all images
+          for IMAGE in document document-source sheets presentation; do
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/teamsync-${IMAGE}:latest 2>/dev/null || continue
+            SIZE=$(docker images ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/teamsync-${IMAGE}:latest --format "{{.Size}}")
+            if [ "$IMAGE" == "document-source" ]; then
+              BUILD_TYPE="Full Source Build"
+            else
+              BUILD_TYPE="Pre-built Assets"
+            fi
+            echo "| teamsync-${IMAGE} | ${SIZE} | ${BUILD_TYPE} |" >> $GITHUB_STEP_SUMMARY
+          done
 
-          docker manifest annotate ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/teamsync-${{ matrix.product }}:latest \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/teamsync-${{ matrix.product }}:arm64-latest \
-            --os linux --arch arm64
-
-          # Push the manifest
-          docker manifest push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/teamsync-${{ matrix.product }}:latest
-
-          echo "### Multi-platform Manifest Created" >> $GITHUB_STEP_SUMMARY
-          echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/teamsync-${{ matrix.product }}:latest" >> $GITHUB_STEP_SUMMARY
-          echo "Platforms: linux/amd64, linux/arm64" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Notes" >> $GITHUB_STEP_SUMMARY
+          echo "- **Pre-built Assets**: Uses pre-compiled LibreOffice binaries (fast build, ~30-60 min)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Full Source Build**: Compiles LibreOffice from source with optimizations (slow build, ~3-5 hours)" >> $GITHUB_STEP_SUMMARY
