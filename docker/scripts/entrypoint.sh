@@ -247,7 +247,7 @@ COOLWSD_ARGS=(
     "--o:security.seccomp=false"
     "--o:security.capabilities=false"
     "--o:mount_jail_tree=false"
-    "--o:net.proto=all"
+    "--o:net.proto=IPv4"
     "--o:net.listen=any"
 )
 
