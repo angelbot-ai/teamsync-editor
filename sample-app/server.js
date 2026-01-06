@@ -18,6 +18,11 @@ const multer = require('multer');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const fs = require('fs');
+const dns = require('dns');
+
+// Configure DNS to prefer IPv6 for Railway private networking
+// Railway's .internal domains only resolve to IPv6 addresses
+dns.setDefaultResultOrder('verbatim');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
