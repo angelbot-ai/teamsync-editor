@@ -1,0 +1,198 @@
+# =============================================================================
+# TeamSync Sheets - 25.04 Component Build (Calc Only)
+# =============================================================================
+#
+# EXPERIMENTAL: Uses Collabora 25.04 component-specific packages
+# This allows installing ONLY Calc (no Writer/Impress) for smaller images
+#
+# Handles: .xlsx, .xls, .ods, .csv
+# Target size: ~600-800 MB (vs ~2GB with full LibreOffice)
+# License: MPL 2.0 Compliant
+#
+# =============================================================================
+
+# =============================================================================
+# STAGE 1: coolwsd Builder - Build from source with 25.04 packages
+# =============================================================================
+FROM debian:bookworm-slim AS coolwsd-builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install base dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    gnupg2 \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Add 25.04 CODE repository
+RUN curl -fsSL https://www.collaboraoffice.com/downloads/gpg/collaboraonline-release-keyring.gpg \
+        -o /usr/share/keyrings/collaboraonline-release-keyring.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/collaboraonline-release-keyring.gpg] https://www.collaboraoffice.com/repos/CollaboraOnline/CODE-deb /" \
+        > /etc/apt/sources.list.d/collaboraonline.list \
+    && apt-get update
+
+# Install ONLY Calc component + coolwsd for LOKit headers
+RUN apt-get install -y --no-install-recommends \
+    collaboraofficebasis-core \
+    collaboraofficebasis-calc \
+    collaboraofficebasis-graphicfilter \
+    collaboraofficebasis-ooofonts \
+    collaboraofficebasis-en-us \
+    collaboraoffice-ure \
+    coolwsd \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install build dependencies for coolwsd source build
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    git \
+    automake \
+    autoconf \
+    libtool \
+    pkg-config \
+    libcap-dev \
+    libpng-dev \
+    libssl-dev \
+    libpam-dev \
+    libzstd-dev \
+    libpoco-dev \
+    libcppunit-dev \
+    python3 \
+    python3-lxml \
+    python3-polib \
+    nodejs \
+    npm \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+# Clone Collabora Online source (25.04 branch)
+ARG COOL_VERSION=distro/collabora/co-25.04
+RUN git clone --depth 1 --single-branch --branch ${COOL_VERSION} \
+    https://github.com/CollaboraOnline/online.git
+
+# Copy branding assets and apply white-label
+COPY docker/branding/sheets/ /build/branding/
+COPY docker/branding/LICENSE_NOTICE.txt /build/branding/
+COPY docker/scripts/white-label.sh /build/white-label.sh
+RUN chmod +x /build/white-label.sh \
+    && /build/white-label.sh /build/online /build/branding
+
+# Replace logo files if provided
+RUN if [ -f /build/branding/images/logo.svg ]; then \
+        find /build/online/browser -type f \( -name "collabora-logo*.svg" -o -name "loleaflet-logo*.svg" \) \
+            -exec cp /build/branding/images/logo.svg {} \; 2>/dev/null || true; \
+    fi
+
+# Install npm dependencies for browser build
+WORKDIR /build/online/browser
+RUN npm install --no-audit
+
+# Build coolwsd from source (this also builds browser assets via configure/make)
+WORKDIR /build/online
+RUN ./autogen.sh && ./configure \
+    --prefix=/opt/cool \
+    --with-lokit-path=/opt/cool/include \
+    --with-lo-path=/opt/collaboraoffice \
+    --disable-setcap \
+    --enable-silent-rules
+
+RUN make -j$(nproc)
+RUN make DESTDIR=/install install
+
+# =============================================================================
+# STAGE 2: Runtime - CALC ONLY (~600-800 MB target)
+# =============================================================================
+FROM debian:bookworm-slim AS runtime
+
+# Production environment configuration
+ENV DEBIAN_FRONTEND=noninteractive \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
+    TEAMSYNC_PRODUCT="sheets" \
+    # Collabora Online performance tuning defaults
+    MEMPROPORTION=80.0 \
+    MAX_CONNECTIONS=100000 \
+    MAX_DOCUMENTS=10000 \
+    # Disable core dumps in production
+    COOL_NO_DUMP=1
+
+# OCI Image Labels
+LABEL maintainer="TeamSync <support@teamsync.io>" \
+      org.opencontainers.image.title="TeamSync Sheets (25.04)" \
+      org.opencontainers.image.description="Production-optimized collaborative spreadsheet editing - 25.04 component build" \
+      org.opencontainers.image.licenses="MPL-2.0" \
+      org.opencontainers.image.vendor="TeamSync" \
+      org.opencontainers.image.source="https://github.com/angelbot-ai/teamsync-editor" \
+      teamsync.product="sheets" \
+      teamsync.filetypes="xlsx,xls,ods,csv" \
+      teamsync.version="25.04"
+
+# Install base dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    gnupg2 \
+    ca-certificates \
+    libcap2-bin \
+    fontconfig \
+    fonts-liberation \
+    hunspell \
+    hunspell-en-us \
+    locales \
+    tzdata \
+    && rm -rf /var/lib/apt/lists/*
+
+# Add 25.04 CODE repository and install ONLY Calc component
+RUN curl -fsSL https://www.collaboraoffice.com/downloads/gpg/collaboraonline-release-keyring.gpg \
+        -o /usr/share/keyrings/collaboraonline-release-keyring.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/collaboraonline-release-keyring.gpg] https://www.collaboraoffice.com/repos/CollaboraOnline/CODE-deb /" \
+        > /etc/apt/sources.list.d/collaboraonline.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+        # Core runtime (REQUIRED)
+        collaboraofficebasis-core \
+        collaboraoffice-ure \
+        # Calc ONLY (no writer, impress)
+        collaboraofficebasis-calc \
+        # Supporting packages
+        collaboraofficebasis-graphicfilter \
+        collaboraofficebasis-ooofonts \
+        collaboraofficebasis-en-us \
+        # coolwsd-deprecated for coolforkit-caps (Railway compatibility)
+        coolwsd-deprecated \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# Build fontconfig cache
+RUN fc-cache -fv
+
+# Copy source-built coolwsd binaries (with branding)
+COPY --from=coolwsd-builder /install/opt/cool/ /opt/cool/
+
+# Copy license notice
+COPY docker/branding/LICENSE_NOTICE.txt /opt/cool/LICENSE_NOTICE.txt
+
+# Set capabilities on coolforkit-caps for local testing
+# On Railway, capabilities won't be available but coolforkit-caps handles this gracefully
+RUN setcap cap_fowner,cap_chown,cap_sys_chroot=ep /opt/cool/bin/coolforkit-caps 2>/dev/null || true
+
+# Create required directories
+RUN mkdir -p /opt/cool/child-roots \
+    && mkdir -p /var/log/coolwsd \
+    && mkdir -p /var/cache/coolwsd \
+    && mkdir -p /tmp/coolwsd
+
+# Copy entrypoint script
+COPY --chmod=755 docker/scripts/entrypoint-25.sh /start.sh
+
+# Expose default port
+EXPOSE 9980
+
+# Production-ready healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --start-period=180s --retries=3 \
+    CMD curl -sf http://localhost:${PORT:-9980}/hosting/discovery > /dev/null || exit 1
+
+WORKDIR /opt/cool
+
+ENTRYPOINT ["/start.sh"]

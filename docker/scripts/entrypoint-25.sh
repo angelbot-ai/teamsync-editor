@@ -1,0 +1,183 @@
+#!/bin/bash
+# =============================================================================
+# TeamSync Editor - 25.04 Container Entrypoint Script
+# =============================================================================
+#
+# This script configures and starts coolwsd for 25.04 builds with source-built
+# coolwsd binaries and Collabora LibreOffice component packages.
+#
+# Environment Variables:
+#   WOPI_HOST_URL       - URL of your WOPI host (e.g., http://localhost:3000)
+#   COOL_ADMIN_USER     - Admin console username (optional)
+#   COOL_ADMIN_PASSWORD - Admin console password (optional)
+#   EXTRA_PARAMS        - Additional coolwsd parameters
+#   SSL_ENABLE          - Enable SSL (true/false, default: false for dev)
+#   SSL_TERMINATION     - SSL termination (true = handled by reverse proxy)
+#   LOG_LEVEL           - Log level (trace, debug, information, warning, error)
+#   TEAMSYNC_PRODUCT    - Product variant (document, sheets, presentation)
+#
+# =============================================================================
+
+set -e
+
+# Determine product name based on variant
+TEAMSYNC_PRODUCT="${TEAMSYNC_PRODUCT:-all}"
+case "$TEAMSYNC_PRODUCT" in
+    document)
+        PRODUCT_NAME="TeamSync Document"
+        ;;
+    sheets)
+        PRODUCT_NAME="TeamSync Sheets"
+        ;;
+    presentation)
+        PRODUCT_NAME="TeamSync Presentation"
+        ;;
+    *)
+        PRODUCT_NAME="TeamSync Editor"
+        ;;
+esac
+
+echo "==========================================="
+echo "$PRODUCT_NAME (25.04) - Starting..."
+echo "==========================================="
+
+# =============================================================================
+# Configuration
+# =============================================================================
+CONFIG_FILE="/etc/coolwsd/coolwsd.xml"
+LISTEN_PORT="${PORT:-9980}"
+
+echo "[1/4] Checking configuration..."
+
+# Create config file if it doesn't exist (source build may not have it)
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo "  Creating default configuration..."
+    mkdir -p /etc/coolwsd
+
+    # Check if template exists from coolwsd-deprecated package
+    if [ -f "/usr/share/coolwsd/coolwsd.xml" ]; then
+        cp /usr/share/coolwsd/coolwsd.xml "$CONFIG_FILE"
+    elif [ -f "/opt/cool/etc/coolwsd/coolwsd.xml" ]; then
+        cp /opt/cool/etc/coolwsd/coolwsd.xml "$CONFIG_FILE"
+    else
+        echo "  WARNING: No config template found, coolwsd may fail to start"
+    fi
+fi
+
+# =============================================================================
+# Configure SSL
+# =============================================================================
+echo "[2/4] Configuring SSL..."
+
+SSL_ENABLE="${SSL_ENABLE:-false}"
+SSL_TERMINATION="${SSL_TERMINATION:-true}"
+
+if [ "$SSL_ENABLE" = "true" ]; then
+    echo "  SSL enabled"
+else
+    echo "  SSL disabled (use reverse proxy for production)"
+fi
+
+if [ "$SSL_TERMINATION" = "true" ]; then
+    echo "  SSL termination: reverse proxy"
+fi
+
+# =============================================================================
+# Configure Admin Console
+# =============================================================================
+echo "[3/4] Configuring admin console..."
+
+if [ -n "$COOL_ADMIN_USER" ] && [ -n "$COOL_ADMIN_PASSWORD" ]; then
+    echo "  Admin console enabled for user: $COOL_ADMIN_USER"
+else
+    echo "  Admin console disabled (set COOL_ADMIN_USER and COOL_ADMIN_PASSWORD to enable)"
+fi
+
+# =============================================================================
+# Build command line arguments
+# =============================================================================
+echo "[4/4] Starting coolwsd..."
+echo "  Listening on port: $LISTEN_PORT"
+
+# Railway/cloud deployment configuration:
+# - security.capabilities=true: Forces use of coolforkit-caps (capability-based isolation)
+#   which has graceful fallback when capabilities aren't available
+# - security.seccomp=false: Disable seccomp filtering (not available on Railway)
+# - mount_jail_tree=false: Disable mount namespaces (requires SYS_ADMIN)
+# - mount_namespaces=false: Explicitly disable mount namespaces to use coolforkit-caps
+#
+# The coolforkit-caps binary will detect missing capabilities and fall back to
+# a slower but functional copy-based jail setup instead of bind mounts.
+
+COOLWSD_ARGS=(
+    "--port=${LISTEN_PORT}"
+    "--disable-cool-user-checking"
+    "--o:sys_template_path=/opt/cool/systemplate"
+    "--o:child_root_path=/opt/cool/child-roots"
+    "--o:file_server_root_path=/opt/cool/share/coolwsd"
+    "--o:lo_template_path=/opt/collaboraoffice"
+    "--o:security.seccomp=false"
+    "--o:security.capabilities=true"
+    "--o:mount_jail_tree=false"
+    "--o:mount_namespaces=false"
+    "--o:net.proto=IPv4"
+    "--o:net.listen=any"
+)
+
+# Add config file if it exists
+if [ -f "$CONFIG_FILE" ]; then
+    COOLWSD_ARGS+=("--config-file=${CONFIG_FILE}")
+fi
+
+# SSL configuration
+if [ "$SSL_ENABLE" = "false" ]; then
+    COOLWSD_ARGS+=("--o:ssl.enable=false")
+fi
+
+if [ "$SSL_TERMINATION" = "true" ]; then
+    COOLWSD_ARGS+=("--o:ssl.termination=true")
+fi
+
+# Admin credentials
+if [ -n "$COOL_ADMIN_USER" ]; then
+    COOLWSD_ARGS+=("--o:admin_console.username=${COOL_ADMIN_USER}")
+fi
+
+if [ -n "$COOL_ADMIN_PASSWORD" ]; then
+    COOLWSD_ARGS+=("--o:admin_console.password=${COOL_ADMIN_PASSWORD}")
+fi
+
+# Log level
+LOG_LEVEL="${LOG_LEVEL:-warning}"
+COOLWSD_ARGS+=("--o:logging.level=${LOG_LEVEL}")
+
+# WOPI host configuration
+if [ -n "$WOPI_HOST_URL" ]; then
+    # Extract hostname from URL
+    WOPI_HOSTNAME=$(echo "$WOPI_HOST_URL" | sed -E 's|https?://||' | sed -E 's|:[0-9]+.*||' | sed -E 's|/.*||')
+    COOLWSD_ARGS+=("--o:storage.wopi.host=${WOPI_HOSTNAME}")
+fi
+
+# Add extra parameters if specified
+if [ -n "$EXTRA_PARAMS" ]; then
+    COOLWSD_ARGS+=($EXTRA_PARAMS)
+fi
+
+echo ""
+echo "==========================================="
+echo "$PRODUCT_NAME - Configuration complete"
+echo "==========================================="
+echo ""
+
+# =============================================================================
+# Start coolwsd
+# =============================================================================
+# Try source-built binary first, fall back to package binary
+if [ -x "/opt/cool/bin/coolwsd" ]; then
+    exec /opt/cool/bin/coolwsd "${COOLWSD_ARGS[@]}"
+elif [ -x "/usr/bin/coolwsd" ]; then
+    exec /usr/bin/coolwsd "${COOLWSD_ARGS[@]}"
+else
+    echo "ERROR: coolwsd binary not found!"
+    exit 1
+fi
