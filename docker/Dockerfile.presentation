@@ -71,7 +71,7 @@ RUN echo "Downloading LibreOffice core assets..." && \
 # =============================================================================
 FROM locore AS builder
 
-ARG COOL_VERSION=distro/collabora/co-24.04
+ARG COOL_VERSION=cp-24.04.6-2
 ARG BRAND_NAME="TeamSync Presentation"
 
 WORKDIR /build

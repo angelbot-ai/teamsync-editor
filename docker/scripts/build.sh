@@ -34,7 +34,7 @@ cd "$(dirname "$0")/../.."
 # =============================================================================
 
 LO_CORE_VERSION="${LO_CORE_VERSION:-24.04}"
-COOL_VERSION="${COOL_VERSION:-distro/collabora/co-24.04}"
+COOL_VERSION="${COOL_VERSION:-cp-24.04.6-2}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 REGISTRY="${REGISTRY:-}"
 
