@@ -209,7 +209,7 @@ RUN echo "==> Configuring LibreOffice build..." \
     --without-fonts \
     --with-system-curl \
     --with-system-expat \
-    --with-system-icu \
+    --without-system-icu \
     --with-system-libxml \
     --with-system-openssl \
     --with-system-zlib \
@@ -459,7 +459,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libfreetype6 \
     libfontconfig1 \
     libharfbuzz0b \
-    libicu74 \
+    # Note: ICU is bundled in LibreOffice build (--without-system-icu) due to ICU 74 breakiterator incompatibility
     libexpat1 \
     libxml2 \
     libxslt1.1 \
