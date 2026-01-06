@@ -79,6 +79,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libhunspell-dev \
     libhyphen-dev \
     libicu-dev \
+    libkrb5-dev \
     libjpeg-dev \
     liblangtag-dev \
     liblcms2-dev \
