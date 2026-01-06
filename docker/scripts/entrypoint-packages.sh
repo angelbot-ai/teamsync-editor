@@ -97,6 +97,30 @@ echo "==========================================="
 echo ""
 
 # =============================================================================
+# Ensure proper ownership for cool user
+# =============================================================================
+if [ "$(id -u)" = "0" ]; then
+    # Running as root - fix permissions and switch to cool user
+    chown -R cool:cool /opt/cool 2>/dev/null || true
+    chown -R cool:cool /var/log/coolwsd 2>/dev/null || true
+    chown -R cool:cool /tmp/ssl 2>/dev/null || true
+
+    # Re-exec as cool user
+    exec su -s /bin/sh cool -c "/usr/bin/coolwsd \
+        --version \
+        --use-env-vars \
+        ${cert_params} \
+        --o:sys_template_path=/opt/cool/systemplate \
+        --o:child_root_path=/opt/cool/child-roots \
+        --o:file_server_root_path=/usr/share/coolwsd \
+        --o:cache_files.path=/opt/cool/cache \
+        --o:logging.color=false \
+        --o:stop_on_config_change=true \
+        ${extra_params} \
+        $*"
+fi
+
+# =============================================================================
 # Start coolwsd (official startup command)
 # =============================================================================
 exec /usr/bin/coolwsd \
