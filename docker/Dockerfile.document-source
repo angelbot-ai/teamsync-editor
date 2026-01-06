@@ -117,6 +117,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxt-dev \
     libzmf-dev \
     libzstd-dev \
+    zlib1g-dev \
     pkg-config \
     python3 \
     python3-dev \
