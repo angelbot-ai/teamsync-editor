@@ -63,6 +63,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-polib \
     nodejs \
     npm \
+    rsync \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
