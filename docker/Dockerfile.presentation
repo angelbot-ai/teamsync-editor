@@ -225,6 +225,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # Remove unnecessary files
     && rm -rf /usr/share/doc/* /usr/share/man/* /usr/share/info/*
 
+# Build fontconfig cache to prevent LibreOffice initialization hang
+RUN fc-cache -fv
+
 # Create cool user
 RUN useradd -r -M -d /opt/cool -s /bin/false cool
 

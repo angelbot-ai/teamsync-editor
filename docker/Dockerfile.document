@@ -285,6 +285,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         /usr/share/info/* \
         /usr/share/lintian/*
 
+# Build fontconfig cache to prevent LibreOffice initialization hang
+# This must be done before running coolwsd to avoid runtime font enumeration delays
+RUN fc-cache -fv
+
 # Create non-root service user (security best practice)
 RUN useradd -r -m -d /opt/cool -s /bin/false -c "Collabora Online" cool
 
