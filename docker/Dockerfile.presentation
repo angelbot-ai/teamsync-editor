@@ -1,326 +1,143 @@
 # =============================================================================
-# TeamSync Presentation - Presentation Editor (OPTIMIZED)
+# TeamSync Presentation - Production-Optimized Presentation Editor
+# =============================================================================
 #
 # Handles: .pptx, .ppt, .odp
-# Target size: < 600 MB
-# MPL 2.0 Compliant
+# Optimized for: High performance, millions of users, Railway/cloud deployment
+# License: MPL 2.0 Compliant
+# Build: Uses official Collabora packages (fast build, ~5-10 minutes)
+#
+# This Dockerfile installs coolwsd and coolwsd-deprecated packages from
+# Collabora's official repository, which includes the coolforkit-caps binary
+# that gracefully handles missing Linux capabilities on restricted platforms
+# like Railway, Render, and Cloud Run.
+#
 # =============================================================================
 
 # =============================================================================
-# STAGE 1: Builder Base - Install build dependencies
+# STAGE 1: Branding Builder - Prepare custom branding assets
 # =============================================================================
-FROM ubuntu:22.04 AS builder-base
+FROM debian:bookworm-slim AS branding-builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install build dependencies (cached layer)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
     git \
-    automake \
-    autoconf \
-    libtool \
-    pkg-config \
-    libcap-dev \
-    libcap2-bin \
-    libpng-dev \
-    libssl-dev \
-    libpam-dev \
-    libzstd-dev \
-    libpoco-dev \
-    libcppunit-dev \
+    nodejs \
+    npm \
     python3 \
-    python3-lxml \
-    python3-polib \
-    wget \
-    curl \
-    ca-certificates \
-    fontconfig \
-    cpio \
-    rsync \
-    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Node.js 18 LTS
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
-    apt-get install -y nodejs && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
 WORKDIR /build
 
-# =============================================================================
-# STAGE 2: LibreOffice Core - Download pre-built assets
-# =============================================================================
-FROM builder-base AS locore
-
-ARG LO_CORE_VERSION=24.04
-
-WORKDIR /build
-
-# Download pre-built LibreOffice core assets
-RUN echo "Downloading LibreOffice core assets..." && \
-    wget -q --show-progress \
-    https://github.com/CollaboraOnline/online/releases/download/for-code-assets/core-co-${LO_CORE_VERSION}-assets.tar.gz \
-    -O core-assets.tar.gz && \
-    tar -xzf core-assets.tar.gz && \
-    rm core-assets.tar.gz
-
-# =============================================================================
-# STAGE 3: Build Collabora Online with White-Labeling
-# =============================================================================
-FROM locore AS builder
-
-ARG COOL_VERSION=cp-24.04.6-2
-ARG BRAND_NAME="TeamSync Presentation"
-
-WORKDIR /build
-
-# Clone Collabora Online source
-RUN git clone --depth 1 --branch ${COOL_VERSION} \
+# Clone Collabora Online source for branding customization
+ARG COOL_VERSION=cp-24.04.9-2
+RUN git clone --depth 1 --single-branch --branch ${COOL_VERSION} \
     https://github.com/CollaboraOnline/online.git
 
 # Copy branding assets
 COPY docker/branding/presentation/ /build/branding/
 COPY docker/branding/LICENSE_NOTICE.txt /build/branding/
 
-# Copy and run white-label script
+# Copy and execute white-label script
 COPY docker/scripts/white-label.sh /build/white-label.sh
-RUN chmod +x /build/white-label.sh && \
-    /build/white-label.sh /build/online /build/branding
+RUN chmod +x /build/white-label.sh \
+    && /build/white-label.sh /build/online /build/branding
 
-# Replace logo files
+# Replace logo files if provided
 RUN if [ -f /build/branding/images/logo.svg ]; then \
-        find /build/online/browser -type f -name "collabora-logo*.svg" \
-            -exec cp /build/branding/images/logo.svg {} \; 2>/dev/null || true; \
-        find /build/online/browser -type f -name "loleaflet-logo*.svg" \
+        find /build/online/browser -type f \( -name "collabora-logo*.svg" -o -name "loleaflet-logo*.svg" \) \
             -exec cp /build/branding/images/logo.svg {} \; 2>/dev/null || true; \
     fi
 
-# Apply custom CSS
-RUN if [ -f /build/branding/css/brand-colors.css ]; then \
-        cat /build/branding/css/brand-colors.css >> \
-            /build/online/browser/src/control/Control.UIManager.css 2>/dev/null || true; \
-    fi
-
-# Install browser dependencies and build
+# Build browser assets with branding
 WORKDIR /build/online/browser
-RUN npm install
-
-WORKDIR /build/online
-RUN ./autogen.sh
-
-RUN ./configure \
-    --prefix=/opt/cool \
-    --with-lokit-path=/build/include \
-    --with-lo-path=/opt/lokit \
-    --enable-silent-rules \
-    --disable-setcap \
-    --disable-ssl
-
-RUN make -j$(nproc)
-RUN make DESTDIR=/install install
-
-# Copy LibreOffice and perform AGGRESSIVE cleanup for Impress-only
-RUN mkdir -p /opt/lokit && cp -r /build/instdir/* /opt/lokit/
+RUN npm install --no-audit && make
 
 # =============================================================================
-# AGGRESSIVE CLEANUP - Remove everything except Impress components
+# STAGE 2: Production Runtime - Install from official packages
 # =============================================================================
-RUN cd /opt/lokit && \
-    # Remove help, wizards, gallery, extensions, templates, samples
-    rm -rf help/ share/wizards/ share/gallery/ share/extensions/ \
-           program/classes/ share/template/ share/samples/ \
-           share/autotext/ share/autocorr/ share/Scripts/ \
-           share/basic/Tutorials/ share/config/images_*.zip \
-           share/config/soffice.cfg/scalc/ \
-           share/config/soffice.cfg/swriter/ \
-           share/config/soffice.cfg/sdraw/ 2>/dev/null || true && \
-    # Remove non-English locale files (keep en-US, en-GB only)
-    find share/registry -name "*.xcd" ! -name "main.xcd" ! -name "impress.xcd" \
-         ! -name "Langpack-en*.xcd" -delete 2>/dev/null || true && \
-    # Remove Writer-specific files
-    rm -rf share/config/soffice.cfg/modules/swriter/ 2>/dev/null || true && \
-    # Remove Calc-specific files
-    rm -rf share/config/soffice.cfg/modules/scalc/ 2>/dev/null || true && \
-    # Remove Draw-specific files
-    rm -rf share/config/soffice.cfg/modules/sdraw/ 2>/dev/null || true && \
-    # Remove Math-specific files
-    rm -rf share/config/soffice.cfg/modules/smath/ 2>/dev/null || true && \
-    # Remove Base-specific files
-    rm -rf share/config/soffice.cfg/modules/dbapp/ 2>/dev/null || true && \
-    # Remove unnecessary fonts (keep core fonts only)
-    find share/fonts -type f ! -name "opens*.ttf" ! -name "liber*.ttf" \
-         -delete 2>/dev/null || true && \
-    # Strip debug symbols from binaries
-    find program -type f -name "*.so*" -exec strip --strip-unneeded {} \; 2>/dev/null || true && \
-    find program -type f -executable -exec strip --strip-unneeded {} \; 2>/dev/null || true && \
-    echo "Impress-only cleanup complete"
+FROM debian:bookworm-slim AS runtime
 
-# Create systemplate
-RUN echo "Etc/UTC" > /etc/timezone && \
-    ln -sf /usr/share/zoneinfo/Etc/UTC /etc/localtime && \
-    mkdir -p /install/opt/cool/systemplate /install/opt/cool/child-roots && \
-    ./coolwsd-systemplate-setup /install/opt/cool/systemplate /opt/lokit || true
+# Production environment configuration
+ENV DEBIAN_FRONTEND=noninteractive \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
+    TEAMSYNC_PRODUCT="presentation" \
+    # Collabora Online performance tuning defaults
+    MEMPROPORTION=80.0 \
+    MAX_CONNECTIONS=100000 \
+    MAX_DOCUMENTS=10000 \
+    # Disable core dumps in production
+    COOL_NO_DUMP=1
 
-# Fix systemplate duplication - replace copied LibreOffice with symlink
-# This prevents /opt/lokit from being duplicated inside systemplate
-RUN if [ -d /install/opt/cool/systemplate/opt/lokit ]; then \
-        echo "Removing duplicated LibreOffice from systemplate..." && \
-        du -sh /install/opt/cool/systemplate/opt/lokit && \
-        rm -rf /install/opt/cool/systemplate/opt/lokit && \
-        ln -sf /opt/lokit /install/opt/cool/systemplate/opt/lokit && \
-        echo "Replaced with symlink"; \
-    fi
+# OCI Image Labels for container registries
+LABEL maintainer="TeamSync <support@teamsync.io>" \
+      org.opencontainers.image.title="TeamSync Presentation" \
+      org.opencontainers.image.description="Production-optimized collaborative presentation editing" \
+      org.opencontainers.image.licenses="MPL-2.0" \
+      org.opencontainers.image.vendor="TeamSync" \
+      org.opencontainers.image.source="https://github.com/angelbot-ai/teamsync-editor" \
+      teamsync.product="presentation" \
+      teamsync.filetypes="pptx,ppt,odp" \
+      teamsync.version="1.0.0"
 
-# Size report for debugging
-RUN echo "=== Size Report ===" && \
-    du -sh /opt/lokit && \
-    du -sh /install/opt/cool/systemplate
-
-# Strip coolwsd binaries
-RUN find /install/opt/cool/bin -type f -executable \
-    -exec strip --strip-unneeded {} \; 2>/dev/null || true
-
-# =============================================================================
-# STAGE 4: Runtime Image (Minimal)
-# =============================================================================
-FROM ubuntu:22.04 AS runtime
-
-ENV DEBIAN_FRONTEND=noninteractive
-ENV TEAMSYNC_PRODUCT="presentation"
-
-LABEL maintainer="TeamSync Presentation"
-LABEL description="TeamSync Presentation - Collaborative presentation editing"
-LABEL org.opencontainers.image.licenses="MPL-2.0"
-LABEL teamsync.product="presentation"
-LABEL teamsync.filetypes="pptx,ppt,odp"
-
-# Install MINIMAL runtime dependencies
+# Install Collabora Online from official packages
+# This includes coolwsd-deprecated which provides coolforkit-caps
+ARG COOL_REPO_TYPE=CODE
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libcap2 \
-    libcap2-bin \
-    libpng16-16 \
-    libssl3 \
-    libpam0g \
-    libzstd1 \
-    # Poco runtime libraries (Ubuntu 22.04)
-    libpocofoundation80 \
-    libpoconet80 \
-    libpoconetssl80 \
-    libpococrypto80 \
-    libpocoutil80 \
-    libpocoxml80 \
-    libpocojson80 \
+    apt-transport-https \
     ca-certificates \
+    cpio \
     curl \
-    tzdata \
-    # Minimal fonts
     fontconfig \
     fonts-liberation \
-    # English spell checking only
+    gnupg2 \
     hunspell \
     hunspell-en-us \
-    # LibreOffice runtime dependencies (Ubuntu 22.04)
-    libfreetype6 \
-    libfontconfig1 \
-    libharfbuzz0b \
-    libicu70 \
-    libexpat1 \
-    libxml2 \
-    libxslt1.1 \
-    libnss3 \
-    libnspr4 \
-    libcairo2 \
-    libpixman-1-0 \
-    libglib2.0-0 \
-    libatk1.0-0 \
-    libpango-1.0-0 \
-    libpangocairo-1.0-0 \
-    libx11-6 \
-    libxext6 \
-    libxrender1 \
-    libepoxy0 \
-    liblcms2-2 \
-    libhunspell-1.7-0 \
-    libboost-filesystem1.74.0 \
-    libboost-locale1.74.0 \
-    libgraphite2-3 \
-    liborcus-0.17-0 \
-    libcdr-0.1-1 \
-    libvisio-0.1-1 \
-    libwpd-0.10-10 \
-    libwpg-0.3-3 \
-    libwps-0.4-4 \
-    libmspub-0.1-1 \
-    libe-book-0.1-1 \
-    libabw-0.1-1 \
-    libetonyek-0.1-1 \
-    libfreehand-0.1-1 \
-    libstaroffice-0.0-0 \
-    libzmf-0.0-0 \
-    libpagemaker-0.0-0 \
-    libqxp-0.0-0 \
-    liblangtag1 \
-    librevenge-0.0-0 \
-    libclucene-core1v5 \
-    libxmlsec1-openssl \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* \
-    # Remove unnecessary files
-    && rm -rf /usr/share/doc/* /usr/share/man/* /usr/share/info/*
+    libcap2-bin \
+    libnss-wrapper \
+    locales \
+    tzdata \
+    && rm -rf /var/lib/apt/lists/*
 
-# Build fontconfig cache to prevent LibreOffice initialization hang
+# Add Collabora repository and install packages
+# Using CODE (Community) repository for latest stable packages
+RUN curl -fsSL https://collaboraoffice.com/downloads/gpg/collaboraonline-release-keyring.gpg \
+        -o /usr/share/keyrings/collaboraonline-release-keyring.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/collaboraonline-release-keyring.gpg] \
+        https://www.collaboraoffice.com/repos/CollaboraOnline/CODE/debian bookworm main" \
+        > /etc/apt/sources.list.d/collaboraonline.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+        coolwsd \
+        coolwsd-deprecated \
+        code-brand \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# Build fontconfig cache
 RUN fc-cache -fv
 
-# Create cool user
-RUN useradd -r -M -d /opt/cool -s /bin/false cool
+# Set proper permissions on config
+RUN chmod 644 /etc/coolwsd/coolwsd.xml
 
-# Create directories
-RUN mkdir -p \
-    /opt/cool/systemplate \
-    /opt/cool/child-roots \
-    /opt/cool/browser \
-    /etc/coolwsd \
-    /var/log/coolwsd \
-    /var/cache/coolwsd \
-    /tmp/coolwsd
+# Copy branded browser assets from builder stage
+COPY --from=branding-builder /build/online/browser/dist/ /usr/share/coolwsd/browser/dist/
 
-# Copy files from builder (excluding systemplate to avoid duplication)
-COPY --from=builder /install/opt/cool/bin /opt/cool/bin
-COPY --from=builder /install/opt/cool/share /opt/cool/share
-COPY --from=builder /install/opt/cool/child-roots /opt/cool/child-roots
-COPY --from=builder /opt/lokit /opt/lokit
-COPY --from=builder /build/online/coolwsd.xml /etc/coolwsd/coolwsd.xml
-
-# Create systemplate with symlink to lokit (avoids ~400MB duplication)
-RUN mkdir -p /opt/cool/systemplate/opt && \
-    ln -sf /opt/lokit /opt/cool/systemplate/opt/lokit
-
-# Copy LICENSE notice
+# Copy license notice
 COPY docker/branding/LICENSE_NOTICE.txt /opt/cool/LICENSE_NOTICE.txt
 
-# Setup symlinks and permissions
-RUN ln -sf /opt/cool/share/coolwsd/browser /opt/cool/bin/browser && \
-    ln -sf /opt/cool/share/coolwsd/discovery.xml /opt/cool/bin/discovery.xml && \
-    ln -sf /opt/cool/share/coolwsd/favicon.ico /opt/cool/bin/favicon.ico && \
-    ln -sf /opt/cool/systemplate /opt/cool/bin/systemplate && \
-    mkdir -p /opt/cool/bin/jails && \
-    chown -R cool:cool /opt/cool /var/log/coolwsd /var/cache/coolwsd /tmp/coolwsd && \
-    chmod 755 /opt/cool/bin/* && \
-    (setcap cap_fowner,cap_chown,cap_mknod,cap_sys_chroot=ep /opt/cool/bin/coolforkit-caps 2>/dev/null || \
-     setcap cap_fowner,cap_chown,cap_mknod,cap_sys_chroot=ep /opt/cool/bin/coolforkit-ns 2>/dev/null || true)
+# Copy entrypoint script (uses official paths)
+COPY --chmod=755 docker/scripts/entrypoint-packages.sh /start-collabora-online.sh
 
-# Copy entrypoint script
-COPY docker/scripts/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
+# Expose default port
 EXPOSE 9980
 
-# Healthcheck uses PORT env var if set (for Railway/Render), otherwise 9980
-HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=5 \
+# Production-ready healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --start-period=180s --retries=3 \
     CMD curl -sf http://localhost:${PORT:-9980}/hosting/discovery > /dev/null || exit 1
 
 WORKDIR /opt/cool
 
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/start-collabora-online.sh"]
