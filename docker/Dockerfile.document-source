@@ -270,7 +270,7 @@ RUN mkdir -p /build/include \
 # =============================================================================
 FROM locore AS builder
 
-ARG COOL_VERSION=distro/collabora/co-24.04
+ARG COOL_VERSION=cp-24.04.6-2
 ARG BRAND_NAME="TeamSync Document"
 
 WORKDIR /build
