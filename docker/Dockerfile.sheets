@@ -205,13 +205,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpam0g \
     libzstd1 \
     # Poco runtime libraries (Ubuntu 22.04)
-    libpocofoundation70 \
-    libpoconet70 \
-    libpoconetssl70 \
-    libpococrypto70 \
-    libpocoutil70 \
-    libpocoxml70 \
-    libpocojson70 \
+    libpocofoundation80 \
+    libpoconet80 \
+    libpoconetssl80 \
+    libpococrypto80 \
+    libpocoutil80 \
+    libpocoxml80 \
+    libpocojson80 \
     ca-certificates \
     curl \
     tzdata \
