@@ -25,10 +25,12 @@ class TeamSyncApp {
         this.currentToken = null;
         this.isConnected = false;
         this.currentFilter = 'all';
+        this.useUnifiedEditor = localStorage.getItem('useUnifiedEditor') === 'true';
         this.serviceStatus = {
             'teamsync-document': 'checking',
             'teamsync-sheets': 'checking',
-            'teamsync-presentation': 'checking'
+            'teamsync-presentation': 'checking',
+            'teamsync-editor': 'checking'
         };
 
         // File type mappings
@@ -73,6 +75,8 @@ class TeamSyncApp {
             statusDocument: document.getElementById('status-document'),
             statusSheets: document.getElementById('status-sheets'),
             statusPresentation: document.getElementById('status-presentation'),
+            unifiedEditorToggle: document.getElementById('unified-editor-toggle'),
+            editorModeToggle: document.querySelector('.editor-mode-toggle'),
         };
 
         this.selectedUploadType = 'document';
@@ -82,11 +86,68 @@ class TeamSyncApp {
 
     async init() {
         this.bindEvents();
+        this.initEditorModeToggle();
         await this.checkConnection();
         await this.loadDocuments();
 
         // Start health check polling
         setInterval(() => this.checkConnection(), this.config.healthCheckInterval);
+    }
+
+    /**
+     * Initialize the editor mode toggle switch
+     */
+    initEditorModeToggle() {
+        // Set initial state from localStorage
+        if (this.elements.unifiedEditorToggle) {
+            this.elements.unifiedEditorToggle.checked = this.useUnifiedEditor;
+            this.updateEditorModeUI();
+        }
+    }
+
+    /**
+     * Update the UI to reflect current editor mode
+     */
+    updateEditorModeUI() {
+        if (this.elements.editorModeToggle) {
+            if (this.useUnifiedEditor) {
+                this.elements.editorModeToggle.classList.add('unified');
+            } else {
+                this.elements.editorModeToggle.classList.remove('unified');
+            }
+        }
+    }
+
+    /**
+     * Toggle between unified and multi-app editor modes
+     */
+    async toggleEditorMode() {
+        this.useUnifiedEditor = !this.useUnifiedEditor;
+        localStorage.setItem('useUnifiedEditor', this.useUnifiedEditor);
+        this.updateEditorModeUI();
+
+        // Close any open document when switching modes
+        if (this.currentDocument) {
+            this.closeDocument();
+        }
+
+        // Update the server configuration
+        try {
+            await fetch(`${this.config.apiBaseUrl}/config/editor-mode`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ useUnifiedEditor: this.useUnifiedEditor })
+            });
+        } catch (error) {
+            console.warn('Could not update server editor mode:', error);
+        }
+
+        // Re-check health to update service indicators
+        await this.checkConnection();
+
+        // Show feedback
+        const mode = this.useUnifiedEditor ? 'Unified Editor' : 'Multi-App';
+        this.showSuccess(`Switched to ${mode} mode`);
     }
 
     bindEvents() {
@@ -142,6 +203,11 @@ class TeamSyncApp {
         this.elements.filterTabs.querySelectorAll('.filter-tab').forEach(tab => {
             tab.addEventListener('click', () => this.setFilter(tab.dataset.filter));
         });
+
+        // Editor mode toggle
+        if (this.elements.unifiedEditorToggle) {
+            this.elements.unifiedEditorToggle.addEventListener('change', () => this.toggleEditorMode());
+        }
 
         // Listen for messages from the editor iframe
         window.addEventListener('message', (e) => this.handleEditorMessage(e));
@@ -264,17 +330,25 @@ class TeamSyncApp {
         const container = this.elements.serviceIndicators;
         if (!container) return;
 
-        const services = [
-            { key: 'teamsync-document', label: 'Doc', class: 'document' },
-            { key: 'teamsync-sheets', label: 'Sheet', class: 'sheets' },
-            { key: 'teamsync-presentation', label: 'Slide', class: 'presentation' }
-        ];
-
-        container.innerHTML = services.map(service => {
-            const status = this.serviceStatus[service.key];
+        if (this.useUnifiedEditor) {
+            // Show single unified editor indicator
+            const status = this.serviceStatus['teamsync-editor'];
             const healthClass = status === 'healthy' ? 'healthy' : 'unhealthy';
-            return `<span class="service-indicator ${service.class} ${healthClass}" title="${service.key}: ${status}">${service.label}</span>`;
-        }).join('');
+            container.innerHTML = `<span class="service-indicator unified ${healthClass}" title="teamsync-editor: ${status}">Unified</span>`;
+        } else {
+            // Show multi-app indicators
+            const services = [
+                { key: 'teamsync-document', label: 'Doc', class: 'document' },
+                { key: 'teamsync-sheets', label: 'Sheet', class: 'sheets' },
+                { key: 'teamsync-presentation', label: 'Slide', class: 'presentation' }
+            ];
+
+            container.innerHTML = services.map(service => {
+                const status = this.serviceStatus[service.key];
+                const healthClass = status === 'healthy' ? 'healthy' : 'unhealthy';
+                return `<span class="service-indicator ${service.class} ${healthClass}" title="${service.key}: ${status}">${service.label}</span>`;
+            }).join('');
+        }
     }
 
     updateConnectionStatus(status, health = null) {
@@ -415,6 +489,10 @@ class TeamSyncApp {
     }
 
     isServiceAvailable(docType) {
+        if (this.useUnifiedEditor) {
+            // In unified mode, all file types use the same editor service
+            return this.serviceStatus['teamsync-editor'] === 'healthy';
+        }
         const productInfo = this.getProductInfo(docType);
         return this.serviceStatus[productInfo.service] === 'healthy';
     }
@@ -474,7 +552,7 @@ class TeamSyncApp {
 
             // Get WOPI access token and iframe URL from the backend
             // Always request fresh token with cache-busting
-            console.log(`[DEBUG] Requesting fresh token for ${doc.id}...`);
+            console.log(`[DEBUG] Requesting fresh token for ${doc.id} (unified=${this.useUnifiedEditor})...`);
             const tokenStartTime = performance.now();
             const response = await fetch(`${this.config.apiBaseUrl}/documents/${doc.id}/token?_t=${Date.now()}`, {
                 method: 'POST',
@@ -484,7 +562,8 @@ class TeamSyncApp {
                     'Pragma': 'no-cache',
                 },
                 body: JSON.stringify({
-                    permissions: 'edit'
+                    permissions: 'edit',
+                    useUnifiedEditor: this.useUnifiedEditor
                 }),
                 cache: 'no-store'
             });
