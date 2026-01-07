@@ -63,36 +63,41 @@ CONFIG_FILE="/etc/coolwsd/coolwsd.xml"
 if [ -f "$CONFIG_FILE" ]; then
     echo "  Patching config for cloud platform compatibility..."
 
-    # Create a writable copy if needed
-    if [ ! -w "$CONFIG_FILE" ]; then
-        cp "$CONFIG_FILE" /tmp/coolwsd.xml
-        CONFIG_FILE="/tmp/coolwsd.xml"
-    fi
+    # Create a writable copy
+    cp "$CONFIG_FILE" /tmp/coolwsd.xml
+    CONFIG_FILE="/tmp/coolwsd.xml"
 
-    # Patch mount_jail_tree to false (disable bind-mount based jail)
+    # Patch or add mount_jail_tree to false
     if grep -q "<mount_jail_tree>" "$CONFIG_FILE"; then
         sed -i 's|<mount_jail_tree>[^<]*</mount_jail_tree>|<mount_jail_tree>false</mount_jail_tree>|g' "$CONFIG_FILE"
     else
-        # Add mount_jail_tree setting if not present (add before </config>)
-        sed -i 's|</config>|    <mount_jail_tree>false</mount_jail_tree>\n</config>|' "$CONFIG_FILE"
+        sed -i 's|</config>|    <mount_jail_tree>false</mount_jail_tree></config>|' "$CONFIG_FILE"
     fi
 
-    # Patch mount_namespaces to false (disable mount namespaces)
+    # Patch or add mount_namespaces to false
     if grep -q "<mount_namespaces>" "$CONFIG_FILE"; then
         sed -i 's|<mount_namespaces>[^<]*</mount_namespaces>|<mount_namespaces>false</mount_namespaces>|g' "$CONFIG_FILE"
     else
-        sed -i 's|</config>|    <mount_namespaces>false</mount_namespaces>\n</config>|' "$CONFIG_FILE"
+        sed -i 's|</config>|    <mount_namespaces>false</mount_namespaces></config>|' "$CONFIG_FILE"
     fi
 
-    # Patch security.seccomp to false
+    # Patch or add security.seccomp to false
     if grep -q "<seccomp>" "$CONFIG_FILE"; then
         sed -i 's|<seccomp>[^<]*</seccomp>|<seccomp>false</seccomp>|g' "$CONFIG_FILE"
+    else
+        sed -i 's|</config>|    <seccomp>false</seccomp></config>|' "$CONFIG_FILE"
     fi
 
-    # If we created a temp copy, we need to use it via --config-file
-    if [ "$CONFIG_FILE" = "/tmp/coolwsd.xml" ]; then
-        config_param="--config-file=/tmp/coolwsd.xml"
+    # Patch or add security.capabilities to false
+    if grep -q "<capabilities>" "$CONFIG_FILE"; then
+        sed -i 's|<capabilities>[^<]*</capabilities>|<capabilities>false</capabilities>|g' "$CONFIG_FILE"
+    else
+        sed -i 's|</config>|    <capabilities>false</capabilities></config>|' "$CONFIG_FILE"
     fi
+
+    # Use the patched config file
+    config_param="--config-file=/tmp/coolwsd.xml"
+    echo "  Config patched: mount_jail_tree=false, mount_namespaces=false, seccomp=false, capabilities=false"
 fi
 
 # =============================================================================
@@ -124,15 +129,15 @@ teamsync_params=""
 # - mount_jail_tree=false: Disable bind-mount based jail (requires SYS_ADMIN)
 # - mount_namespaces=false: Disable mount namespaces (requires SYS_ADMIN)
 # - security.seccomp=false: Disable seccomp filtering (not available)
-# - security.capabilities=true: Use coolforkit-caps with graceful fallback
+# - security.capabilities=false: Disable capability-based isolation entirely
 #
-# The coolforkit-caps binary will detect missing capabilities and use a
-# copy-based jail setup instead of bind mounts - slower but functional.
+# With capabilities disabled, coolwsd will use coolforkit without capability
+# checks, falling back to a simpler jail setup that works on restricted platforms.
 # =============================================================================
 teamsync_params="${teamsync_params} --o:mount_jail_tree=false"
 teamsync_params="${teamsync_params} --o:mount_namespaces=false"
 teamsync_params="${teamsync_params} --o:security.seccomp=false"
-teamsync_params="${teamsync_params} --o:security.capabilities=true"
+teamsync_params="${teamsync_params} --o:security.capabilities=false"
 
 # Disable SSL for reverse proxy deployments (Railway handles SSL termination)
 teamsync_params="${teamsync_params} --o:ssl.enable=false --o:ssl.termination=true"
