@@ -122,10 +122,15 @@ COOLWSD_ARGS=(
     "--o:mount_namespaces=false"
     "--o:net.proto=IPv4"
     "--o:net.listen=any"
-    # Performance tuning
-    "--o:num_prespawn_children=3"
+    # Performance tuning (matching official Collabora defaults)
+    "--o:num_prespawn_children=4"
     "--o:per_document.max_concurrency=4"
-    "--o:per_document.limit_load_secs=60"
+    "--o:per_document.limit_load_secs=100"
+    "--o:per_document.idle_timeout_secs=3600"
+    "--o:per_document.limit_store_failures=5"
+    "--o:per_document.cleanup.cleanup_interval_ms=10000"
+    "--o:per_document.cleanup.bad_behavior_period_secs=60"
+    "--o:per_document.cleanup.idle_time_secs=300"
 )
 
 # Add config file if it exists
