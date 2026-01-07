@@ -706,7 +706,7 @@ app.get('/wopi/files/:fileId', validateWopiToken, (req, res) => {
 
         // Status
         IsAnonymousUser: false,
-        IsAdminUser: false,
+        IsAdminUser: true,  // Set to true to enable admin features in Collabora
         ReadOnly: !canWrite,
         RestrictedWebViewOnly: false,
         LastModifiedTime: doc.lastModified,
@@ -718,10 +718,18 @@ app.get('/wopi/files/:fileId', validateWopiToken, (req, res) => {
 
         // PostMessage settings for iframe communication
         PostMessageOrigin: config.publicUrl,
+        EnableOwnerTermination: true,  // Allow host to terminate sessions
         EnableInsertRemoteImage: false,
         DisableExport: false,
         DisablePrint: false,
         DisableCopy: false,
+
+        // Additional WOPI properties for better integration
+        UserCanRename: canWrite,
+        FileNameMaxLength: 255,
+        EditModePostMessage: true,  // Enable PostMessage for edit mode changes
+        FileSharingPostMessage: true,  // Enable PostMessage for file sharing
+        ClosePostMessage: true,  // Enable PostMessage when document closes
     });
 });
 
