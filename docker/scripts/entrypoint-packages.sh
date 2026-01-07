@@ -53,6 +53,49 @@ if [ "$user_id" -ne 1001 ]; then
 fi
 
 # =============================================================================
+# Patch coolwsd.xml config file for Railway/cloud compatibility
+# =============================================================================
+# CRITICAL: These settings MUST be in the XML config file, not just command-line,
+# because coolwsd reads the config and tries to initialize mount namespaces
+# BEFORE command-line overrides take effect.
+
+CONFIG_FILE="/etc/coolwsd/coolwsd.xml"
+if [ -f "$CONFIG_FILE" ]; then
+    echo "  Patching config for cloud platform compatibility..."
+
+    # Create a writable copy if needed
+    if [ ! -w "$CONFIG_FILE" ]; then
+        cp "$CONFIG_FILE" /tmp/coolwsd.xml
+        CONFIG_FILE="/tmp/coolwsd.xml"
+    fi
+
+    # Patch mount_jail_tree to false (disable bind-mount based jail)
+    if grep -q "<mount_jail_tree>" "$CONFIG_FILE"; then
+        sed -i 's|<mount_jail_tree>[^<]*</mount_jail_tree>|<mount_jail_tree>false</mount_jail_tree>|g' "$CONFIG_FILE"
+    else
+        # Add mount_jail_tree setting if not present (add before </config>)
+        sed -i 's|</config>|    <mount_jail_tree>false</mount_jail_tree>\n</config>|' "$CONFIG_FILE"
+    fi
+
+    # Patch mount_namespaces to false (disable mount namespaces)
+    if grep -q "<mount_namespaces>" "$CONFIG_FILE"; then
+        sed -i 's|<mount_namespaces>[^<]*</mount_namespaces>|<mount_namespaces>false</mount_namespaces>|g' "$CONFIG_FILE"
+    else
+        sed -i 's|</config>|    <mount_namespaces>false</mount_namespaces>\n</config>|' "$CONFIG_FILE"
+    fi
+
+    # Patch security.seccomp to false
+    if grep -q "<seccomp>" "$CONFIG_FILE"; then
+        sed -i 's|<seccomp>[^<]*</seccomp>|<seccomp>false</seccomp>|g' "$CONFIG_FILE"
+    fi
+
+    # If we created a temp copy, we need to use it via --config-file
+    if [ "$CONFIG_FILE" = "/tmp/coolwsd.xml" ]; then
+        config_param="--config-file=/tmp/coolwsd.xml"
+    fi
+fi
+
+# =============================================================================
 # TeamSync-specific configuration
 # =============================================================================
 
@@ -132,6 +175,7 @@ if [ "$(id -u)" = "0" ]; then
     # Export environment variables for the cool user
     export cert_params
     export extra_params
+    export config_param
 
     # Re-exec as cool user using gosu or su
     # gosu is preferred for containers as it doesn't create a new session
@@ -140,6 +184,7 @@ if [ "$(id -u)" = "0" ]; then
             --version \
             --use-env-vars \
             --disable-cool-user-checking \
+            ${config_param} \
             ${cert_params} \
             --o:sys_template_path=/opt/cool/systemplate \
             --o:child_root_path=/opt/cool/child-roots \
@@ -155,6 +200,7 @@ if [ "$(id -u)" = "0" ]; then
             --version \
             --use-env-vars \
             --disable-cool-user-checking \
+            ${config_param} \
             ${cert_params} \
             --o:sys_template_path=/opt/cool/systemplate \
             --o:child_root_path=/opt/cool/child-roots \
@@ -174,6 +220,7 @@ exec /usr/bin/coolwsd \
     --version \
     --use-env-vars \
     --disable-cool-user-checking \
+    ${config_param} \
     ${cert_params} \
     --o:sys_template_path=/opt/cool/systemplate \
     --o:child_root_path=/opt/cool/child-roots \
