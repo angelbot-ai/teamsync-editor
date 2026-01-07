@@ -150,6 +150,12 @@ RUN chmod +x /tmp/apply-branding.sh \
 COPY docker/branding/LICENSE_NOTICE.txt /opt/cool/LICENSE_NOTICE.txt
 
 # =============================================================================
+# Ensure cool user and group exist (may already be created by coolwsd package)
+# =============================================================================
+RUN getent group cool || groupadd -r cool \
+    && getent passwd cool || useradd -r -g cool -d /opt/cool -s /bin/false cool
+
+# =============================================================================
 # Setup directories and permissions
 # =============================================================================
 # Create all required directories with proper ownership for the cool user
@@ -157,15 +163,24 @@ COPY docker/branding/LICENSE_NOTICE.txt /opt/cool/LICENSE_NOTICE.txt
 RUN mkdir -p /opt/cool/child-roots \
     && mkdir -p /opt/cool/systemplate \
     && mkdir -p /opt/cool/cache \
+    && mkdir -p /opt/cool/etc/coolwsd \
     && mkdir -p /var/log/coolwsd \
+    && mkdir -p /var/cache/coolwsd \
+    && mkdir -p /tmp/coolwsd \
     && mkdir -p /tmp/ssl \
     && chown -R cool:cool /opt/cool \
     && chown -R cool:cool /var/log/coolwsd \
+    && chown -R cool:cool /var/cache/coolwsd \
+    && chown -R cool:cool /tmp/coolwsd \
     && chown -R cool:cool /tmp/ssl \
     && chmod 755 /opt/cool/child-roots
 
-# Copy entrypoint script
-COPY --chmod=755 docker/scripts/entrypoint-packages.sh /start-collabora-online.sh
+# Set capabilities on coolforkit-caps for local testing
+# On Railway, capabilities won't be available but coolforkit-caps handles this gracefully
+RUN setcap cap_fowner,cap_chown,cap_sys_chroot=ep /usr/bin/coolforkit-caps 2>/dev/null || true
+
+# Copy entrypoint script (use the simpler 25.04 script that expects to run as cool user)
+COPY --chmod=755 docker/scripts/entrypoint-25.sh /start.sh
 
 # Expose default port and monitoring port
 EXPOSE 9980 9191
@@ -176,4 +191,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=180s --retries=3 \
 
 WORKDIR /opt/cool
 
-ENTRYPOINT ["/start-collabora-online.sh"]
+# Run as cool user (required by coolwsd - it refuses to run as root)
+USER cool
+
+ENTRYPOINT ["/start.sh"]
