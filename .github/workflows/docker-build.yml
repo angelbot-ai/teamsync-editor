@@ -15,7 +15,7 @@ on:
       image:
         description: 'Which image to build'
         required: true
-        default: 'all'
+        default: 'editor-source'
         type: choice
         options:
           - all
