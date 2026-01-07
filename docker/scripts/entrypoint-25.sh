@@ -122,6 +122,10 @@ COOLWSD_ARGS=(
     "--o:mount_namespaces=false"
     "--o:net.proto=IPv4"
     "--o:net.listen=any"
+    # Performance tuning
+    "--o:num_prespawn_children=3"
+    "--o:per_document.max_concurrency=4"
+    "--o:per_document.limit_load_secs=60"
 )
 
 # Add config file if it exists
@@ -150,6 +154,11 @@ fi
 # Log level
 LOG_LEVEL="${LOG_LEVEL:-warning}"
 COOLWSD_ARGS+=("--o:logging.level=${LOG_LEVEL}")
+
+# Memory proportion tuning (percentage of system memory to use)
+if [ -n "$MEMPROPORTION" ]; then
+    COOLWSD_ARGS+=("--o:memproportion=${MEMPROPORTION}")
+fi
 
 # WOPI host configuration
 if [ -n "$WOPI_HOST_URL" ]; then
