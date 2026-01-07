@@ -78,6 +78,82 @@ body {
     gap: 16px;
 }
 
+/* Editor Mode Toggle */
+.editor-mode-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: var(--background);
+    border-radius: 20px;
+    border: 1px solid var(--border);
+}
+
+.toggle-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    transition: color 0.2s;
+}
+
+.toggle-label:first-child {
+    color: var(--primary-color);
+}
+
+.editor-mode-toggle.unified .toggle-label:first-child {
+    color: var(--text-secondary);
+}
+
+.editor-mode-toggle.unified .toggle-label:last-child {
+    color: var(--primary-color);
+}
+
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 36px;
+    height: 20px;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--border);
+    transition: 0.3s;
+    border-radius: 20px;
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 14px;
+    width: 14px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.3s;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background-color: var(--primary-color);
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+    transform: translateX(16px);
+}
+
 /* Status Badge */
 .status-badge {
     display: flex;
@@ -213,6 +289,11 @@ body {
 .service-indicator.presentation {
     background: var(--presentation-bg);
     color: var(--presentation-color);
+}
+
+.service-indicator.unified {
+    background: #e0e7ff;
+    color: #4338ca;
 }
 
 /* Filter Tabs */

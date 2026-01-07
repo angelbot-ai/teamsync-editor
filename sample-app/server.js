@@ -382,17 +382,25 @@ async function getCollaboraUrlPath(collaboraUrl) {
     return discovery.urlPath;
 }
 
-async function buildIframeSrc(fileId, accessToken, filename) {
+async function buildIframeSrc(fileId, accessToken, filename, useUnifiedEditor = false) {
     const startTime = Date.now();
-    // Determine which Collabora instance to use based on file type
+    // Determine which Collabora instance to use based on file type or unified mode
     const docType = getDocumentType(filename);
 
-    // Use internal URL for fetching discovery (server-to-server)
-    const collaboraInternalUrl = getCollaboraUrlForType(docType);
-    // Use public URL for the browser iframe
-    const collaboraPublicUrl = getCollaboraPublicUrlForType(docType);
+    let collaboraInternalUrl, collaboraPublicUrl;
 
-    console.log(`[Router] Building iframe for "${filename}" (${docType})`);
+    if (useUnifiedEditor) {
+        // Unified mode: use single editor for all document types
+        collaboraInternalUrl = config.collaboraEditorUrl;
+        collaboraPublicUrl = config.collaboraEditorPublicUrl;
+        console.log(`[Router] Building iframe for "${filename}" (${docType}) - UNIFIED MODE`);
+    } else {
+        // Multi-app mode: use type-specific servers
+        collaboraInternalUrl = getCollaboraUrlForType(docType);
+        collaboraPublicUrl = getCollaboraPublicUrlForType(docType);
+        console.log(`[Router] Building iframe for "${filename}" (${docType}) - MULTI-APP MODE`);
+    }
+
     console.log(`[Router]   Internal URL: ${collaboraInternalUrl}`);
     console.log(`[Router]   Public URL:   ${collaboraPublicUrl}`);
 
@@ -541,6 +549,28 @@ app.get('/api/health', async (req, res) => {
 });
 
 /**
+ * Get/Set editor mode configuration
+ */
+app.get('/api/config/editor-mode', (req, res) => {
+    res.json({
+        useUnifiedEditor: config.useUnifiedEditor,
+        mode: config.useUnifiedEditor ? 'unified' : 'multi-app'
+    });
+});
+
+app.post('/api/config/editor-mode', (req, res) => {
+    const { useUnifiedEditor } = req.body;
+    if (typeof useUnifiedEditor === 'boolean') {
+        config.useUnifiedEditor = useUnifiedEditor;
+        console.log(`[Config] Editor mode changed to: ${useUnifiedEditor ? 'unified' : 'multi-app'}`);
+    }
+    res.json({
+        useUnifiedEditor: config.useUnifiedEditor,
+        mode: config.useUnifiedEditor ? 'unified' : 'multi-app'
+    });
+});
+
+/**
  * List documents
  */
 app.get('/api/documents', validateAppAuth, (req, res) => {
@@ -595,8 +625,11 @@ app.post('/api/documents/:fileId/token', validateAppAuth, async (req, res) => {
     const startTime = Date.now();
     try {
         const { fileId } = req.params;
-        const { permissions = 'edit' } = req.body;
-        console.log(`[API] Token request: fileId=${fileId} permissions=${permissions}`);
+        const { permissions = 'edit', useUnifiedEditor } = req.body;
+
+        // Use client preference if provided, otherwise fall back to server config
+        const effectiveUnifiedMode = useUnifiedEditor !== undefined ? useUnifiedEditor : config.useUnifiedEditor;
+        console.log(`[API] Token request: fileId=${fileId} permissions=${permissions} unifiedEditor=${effectiveUnifiedMode}`);
 
         // Verify document exists
         if (!localDocuments.has(fileId)) {
@@ -608,20 +641,21 @@ app.post('/api/documents/:fileId/token', validateAppAuth, async (req, res) => {
         // Generate WOPI access token (JWT)
         const accessToken = tokenService.generateWopiToken(fileId, req.user, permissions);
 
-        // Build iframe URL for Collabora (routes to correct server based on file type)
-        const iframeSrc = await buildIframeSrc(fileId, accessToken, doc.name);
+        // Build iframe URL for Collabora (routes to correct server based on file type or unified mode)
+        const iframeSrc = await buildIframeSrc(fileId, accessToken, doc.name, effectiveUnifiedMode);
 
         // Determine document type for client info
         const docType = getDocumentType(doc.name);
 
         const elapsed = Date.now() - startTime;
-        console.log(`[API] Token issued: file=${fileId} (${docType}) user=${req.user.id} permissions=${permissions} - ${elapsed}ms`);
+        console.log(`[API] Token issued: file=${fileId} (${docType}) user=${req.user.id} permissions=${permissions} unified=${effectiveUnifiedMode} - ${elapsed}ms`);
 
         res.json({
             accessToken,
             accessTokenTtl: tokenService.getTokenTtlMs(),
             iframeSrc,
-            documentType: docType
+            documentType: docType,
+            unifiedEditor: effectiveUnifiedMode
         });
     } catch (error) {
         const elapsed = Date.now() - startTime;
