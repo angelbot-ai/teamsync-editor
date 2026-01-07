@@ -44,7 +44,13 @@ echo "==========================================="
 # =============================================================================
 # Configuration
 # =============================================================================
-CONFIG_FILE="/etc/coolwsd/coolwsd.xml"
+# Use /opt/cool/etc for config (writable by cool user) or fall back to /etc/coolwsd
+if [ -w "/opt/cool/etc" ] || mkdir -p /opt/cool/etc 2>/dev/null; then
+    CONFIG_DIR="/opt/cool/etc/coolwsd"
+else
+    CONFIG_DIR="/etc/coolwsd"
+fi
+CONFIG_FILE="${CONFIG_DIR}/coolwsd.xml"
 LISTEN_PORT="${PORT:-9980}"
 
 echo "[1/4] Checking configuration..."
@@ -52,15 +58,19 @@ echo "[1/4] Checking configuration..."
 # Create config file if it doesn't exist (source build may not have it)
 if [ ! -f "$CONFIG_FILE" ]; then
     echo "  Creating default configuration..."
-    mkdir -p /etc/coolwsd
+    mkdir -p "$CONFIG_DIR" 2>/dev/null || true
 
     # Check if template exists from coolwsd-deprecated package
     if [ -f "/usr/share/coolwsd/coolwsd.xml" ]; then
-        cp /usr/share/coolwsd/coolwsd.xml "$CONFIG_FILE"
+        cp /usr/share/coolwsd/coolwsd.xml "$CONFIG_FILE" 2>/dev/null || echo "  Note: Using command-line config only"
     elif [ -f "/opt/cool/etc/coolwsd/coolwsd.xml" ]; then
-        cp /opt/cool/etc/coolwsd/coolwsd.xml "$CONFIG_FILE"
+        cp /opt/cool/etc/coolwsd/coolwsd.xml "$CONFIG_FILE" 2>/dev/null || echo "  Note: Using command-line config only"
+    elif [ -f "/etc/coolwsd/coolwsd.xml" ]; then
+        # Config already exists in system location
+        CONFIG_FILE="/etc/coolwsd/coolwsd.xml"
     else
-        echo "  WARNING: No config template found, coolwsd may fail to start"
+        echo "  Note: No config template found, using command-line config only"
+        CONFIG_FILE=""
     fi
 fi
 
@@ -133,8 +143,8 @@ COOLWSD_ARGS=(
     "--o:per_document.cleanup.idle_time_secs=300"
 )
 
-# Add config file if it exists
-if [ -f "$CONFIG_FILE" ]; then
+# Add config file if it exists and is set
+if [ -n "$CONFIG_FILE" ] && [ -f "$CONFIG_FILE" ]; then
     COOLWSD_ARGS+=("--config-file=${CONFIG_FILE}")
 fi
 

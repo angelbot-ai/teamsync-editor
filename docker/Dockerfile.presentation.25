@@ -200,13 +200,16 @@ RUN setcap cap_fowner,cap_chown,cap_sys_chroot=ep /opt/cool/bin/coolforkit-caps 
 # Create required directories with proper ownership
 RUN mkdir -p /opt/cool/child-roots \
     && mkdir -p /opt/cool/systemplate \
+    && mkdir -p /opt/cool/etc/coolwsd \
     && mkdir -p /var/log/coolwsd \
     && mkdir -p /var/cache/coolwsd \
     && mkdir -p /tmp/coolwsd \
+    && mkdir -p /tmp/ssl \
     && chown -R cool:cool /opt/cool \
     && chown -R cool:cool /var/log/coolwsd \
     && chown -R cool:cool /var/cache/coolwsd \
-    && chown -R cool:cool /tmp/coolwsd
+    && chown -R cool:cool /tmp/coolwsd \
+    && chown -R cool:cool /tmp/ssl
 
 # Generate systemplate for jail setup (faster bind-mount instead of copy)
 RUN /opt/cool/bin/coolwsd-systemplate-setup /opt/cool/systemplate /opt/collaboraoffice 2>/dev/null || \
@@ -224,5 +227,8 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=180s --retries=3 \
     CMD curl -sf http://localhost:${PORT:-9980}/hosting/discovery > /dev/null || exit 1
 
 WORKDIR /opt/cool
+
+# Run as cool user (required by coolwsd - it refuses to run as root)
+USER cool
 
 ENTRYPOINT ["/start.sh"]
