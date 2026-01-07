@@ -189,8 +189,9 @@ COPY --from=coolwsd-builder /install/opt/cool/ /opt/cool/
 # Copy license notice
 COPY docker/branding/LICENSE_NOTICE.txt /opt/cool/LICENSE_NOTICE.txt
 
-# Create cool user and group (required for coolmount security checks)
-RUN groupadd -r cool && useradd -r -g cool -d /opt/cool -s /bin/false cool
+# Ensure cool user and group exist (may already be created by coolwsd-deprecated package)
+RUN getent group cool || groupadd -r cool \
+    && getent passwd cool || useradd -r -g cool -d /opt/cool -s /bin/false cool
 
 # Set capabilities on coolforkit-caps for local testing
 # On Railway, capabilities won't be available but coolforkit-caps handles this gracefully
