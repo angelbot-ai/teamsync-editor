@@ -189,15 +189,28 @@ COPY --from=coolwsd-builder /install/opt/cool/ /opt/cool/
 # Copy license notice
 COPY docker/branding/LICENSE_NOTICE.txt /opt/cool/LICENSE_NOTICE.txt
 
+# Create cool user and group (required for coolmount security checks)
+RUN groupadd -r cool && useradd -r -g cool -d /opt/cool -s /bin/false cool
+
 # Set capabilities on coolforkit-caps for local testing
 # On Railway, capabilities won't be available but coolforkit-caps handles this gracefully
 RUN setcap cap_fowner,cap_chown,cap_sys_chroot=ep /opt/cool/bin/coolforkit-caps 2>/dev/null || true
 
-# Create required directories
+# Create required directories with proper ownership
 RUN mkdir -p /opt/cool/child-roots \
+    && mkdir -p /opt/cool/systemplate \
     && mkdir -p /var/log/coolwsd \
     && mkdir -p /var/cache/coolwsd \
-    && mkdir -p /tmp/coolwsd
+    && mkdir -p /tmp/coolwsd \
+    && chown -R cool:cool /opt/cool \
+    && chown -R cool:cool /var/log/coolwsd \
+    && chown -R cool:cool /var/cache/coolwsd \
+    && chown -R cool:cool /tmp/coolwsd
+
+# Generate systemplate for jail setup (faster bind-mount instead of copy)
+RUN /opt/cool/bin/coolwsd-systemplate-setup /opt/cool/systemplate /opt/collaboraoffice 2>/dev/null || \
+    /usr/bin/coolwsd-systemplate-setup /opt/cool/systemplate /opt/collaboraoffice 2>/dev/null || \
+    echo "Warning: systemplate setup skipped - will use copy-based jails"
 
 # Copy entrypoint script
 COPY --chmod=755 docker/scripts/entrypoint-25.sh /start.sh
