@@ -208,13 +208,9 @@ if [ -n "$COOL_ADMIN_PASSWORD" ]; then
     COOLWSD_ARGS+=("--o:admin_console.password=${COOL_ADMIN_PASSWORD}")
 fi
 
-# Log level - default to debug for performance diagnostics
-LOG_LEVEL="${LOG_LEVEL:-debug}"
+# Log level - default to warning for production
+LOG_LEVEL="${LOG_LEVEL:-warning}"
 COOLWSD_ARGS+=("--o:logging.level=${LOG_LEVEL}")
-
-# Enable file logging for debug analysis
-COOLWSD_ARGS+=("--o:logging.file.enable=true")
-COOLWSD_ARGS+=("--o:logging.file.path=/var/log/coolwsd/coolwsd.log")
 
 # Memory proportion tuning (percentage of system memory to use)
 if [ -n "$MEMPROPORTION" ]; then
