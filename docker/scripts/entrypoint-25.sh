@@ -107,6 +107,11 @@ if [ -n "$CONFIG_FILE" ] && [ -f "$CONFIG_FILE" ]; then
         sed -i 's|<seccomp>[^<]*</seccomp>|<seccomp>false</seccomp>|g' "$CONFIG_FILE" 2>/dev/null || true
     fi
 
+    # Patch security.capabilities to false (Railway doesn't support Linux capabilities)
+    if grep -q "<capabilities>" "$CONFIG_FILE" 2>/dev/null; then
+        sed -i 's|<capabilities>[^<]*</capabilities>|<capabilities>false</capabilities>|g' "$CONFIG_FILE" 2>/dev/null || true
+    fi
+
     echo "  Config patched successfully"
 fi
 
@@ -146,14 +151,13 @@ echo "[4/4] Starting coolwsd..."
 echo "  Listening on port: $LISTEN_PORT"
 
 # Railway/cloud deployment configuration:
-# - security.capabilities=true: Forces use of coolforkit-caps (capability-based isolation)
-#   which has graceful fallback when capabilities aren't available
+# - security.capabilities=false: Disable capability-based isolation (Railway doesn't support caps)
 # - security.seccomp=false: Disable seccomp filtering (not available on Railway)
 # - mount_jail_tree=false: Disable mount namespaces (requires SYS_ADMIN)
-# - mount_namespaces=false: Explicitly disable mount namespaces to use coolforkit-caps
+# - mount_namespaces=false: Explicitly disable mount namespaces
 #
-# The coolforkit-caps binary will detect missing capabilities and fall back to
-# a slower but functional copy-based jail setup instead of bind mounts.
+# With capabilities disabled, coolwsd will use coolforkit without capability checks,
+# falling back to a simpler jail setup that works on restricted platforms.
 
 COOLWSD_ARGS=(
     "--port=${LISTEN_PORT}"
@@ -165,7 +169,7 @@ COOLWSD_ARGS=(
     "--o:file_server_root_path=/opt/cool/share/coolwsd"
     "--o:lo_template_path=/opt/collaboraoffice"
     "--o:security.seccomp=false"
-    "--o:security.capabilities=true"
+    "--o:security.capabilities=false"
     "--o:mount_jail_tree=false"
     "--o:mount_namespaces=false"
     "--o:net.proto=IPv4"
