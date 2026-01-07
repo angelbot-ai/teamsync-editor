@@ -1,0 +1,49 @@
+/* =============================================================================
+ * TeamSync Document - Desktop-specific Branding CSS
+ * Applied only on desktop/notebookbar view
+ * ============================================================================= */
+
+/* Notebookbar tab styling */
+.notebookbar .ui-tab.selected,
+.notebookbar-tabs-container .selected {
+    background-color: var(--teamsync-primary-lightest, #93c5fd) !important;
+    border-bottom-color: var(--teamsync-primary, #2563eb) !important;
+}
+
+/* Desktop toolbar */
+#toolbar-up {
+    border-bottom-color: var(--teamsync-primary-light, #3b82f6) !important;
+}
+
+/* Desktop menu styling */
+.main-nav .has-submenu:hover,
+.main-nav .has-submenu.highlighted {
+    background-color: var(--teamsync-primary, #2563eb) !important;
+}
+
+/* Desktop sidebar */
+.sidebar-panel-header {
+    background-color: var(--teamsync-primary, #2563eb) !important;
+    color: #ffffff !important;
+}
+
+/* Desktop notebookbar groups */
+.notebookbar .unospan,
+.notebookbar .unolabel {
+    color: var(--teamsync-primary-dark, #1d4ed8);
+}
+
+/* Desktop context menu styling */
+.context-menu-item:hover,
+.context-menu-item.highlighted {
+    background-color: var(--teamsync-primary-lightest, #93c5fd) !important;
+}
+
+/* Desktop scrollbar styling */
+::-webkit-scrollbar-thumb {
+    background-color: var(--teamsync-primary-light, #3b82f6);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background-color: var(--teamsync-primary, #2563eb);
+}

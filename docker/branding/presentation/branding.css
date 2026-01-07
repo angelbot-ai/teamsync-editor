@@ -1,0 +1,114 @@
+/* =============================================================================
+ * TeamSync Presentation - Runtime Branding CSS
+ * Presentation variant - Orange theme
+ * ============================================================================= */
+
+:root {
+    /* Primary brand colors - Presentation Orange */
+    --teamsync-primary: #ea580c;
+    --teamsync-primary-dark: #c2410c;
+    --teamsync-primary-light: #f97316;
+    --teamsync-primary-lighter: #fb923c;
+    --teamsync-primary-lightest: #fdba74;
+
+    /* Secondary colors */
+    --teamsync-secondary: #dc2626;
+    --teamsync-accent: #7c3aed;
+
+    /* Override Collabora/COOL variables */
+    --co-primary-element: var(--teamsync-primary);
+    --co-primary-element-light: var(--teamsync-primary-light);
+    --co-primary-element-dark: var(--teamsync-primary-dark);
+    --co-primary-text-color: #ffffff;
+
+    /* VEX theming (used in COOL dialogs) */
+    --vex-brand-color: var(--teamsync-primary);
+    --vex-brand-color-light: var(--teamsync-primary-light);
+    --vex-brand-text-color: #ffffff;
+}
+
+/* Header/toolbar branding */
+.logo-container,
+.brand-logo,
+#main-menu .logo,
+.main-nav .logo {
+    background-color: var(--teamsync-primary) !important;
+}
+
+/* Statusbar branding */
+#toolbar-mobile-back,
+.main-nav {
+    background-color: var(--teamsync-primary) !important;
+}
+
+/* Button primary styling */
+.btn-primary,
+.vex-dialog-button-primary,
+button.primary,
+.ui-pushbutton.primary {
+    background-color: var(--teamsync-primary) !important;
+    border-color: var(--teamsync-primary) !important;
+    color: #ffffff !important;
+}
+
+.btn-primary:hover,
+.vex-dialog-button-primary:hover,
+button.primary:hover,
+.ui-pushbutton.primary:hover {
+    background-color: var(--teamsync-primary-dark) !important;
+    border-color: var(--teamsync-primary-dark) !important;
+}
+
+/* Active/selected states */
+.notebookbar .selected,
+.notebookbar .active,
+#toolbar-up .selected {
+    background-color: var(--teamsync-primary-lightest) !important;
+    border-color: var(--teamsync-primary) !important;
+}
+
+/* Focus states */
+*:focus {
+    outline-color: var(--teamsync-primary-light) !important;
+}
+
+/* Selection highlight */
+::selection {
+    background-color: var(--teamsync-primary-lightest);
+}
+
+/* Links */
+a {
+    color: var(--teamsync-primary);
+}
+
+a:hover {
+    color: var(--teamsync-primary-dark);
+}
+
+/* Hide Collabora branding elements */
+.about-dialog .logo-collabora,
+#about-dialog .collabora-logo {
+    display: none !important;
+}
+
+/* Progress bar */
+.progress-bar,
+#loading-bar {
+    background-color: var(--teamsync-primary) !important;
+}
+
+/* Tab styling */
+.tab-content.active {
+    border-bottom-color: var(--teamsync-primary) !important;
+}
+
+/* Slide panel - presentation specific */
+.slide-sorter .slide-selected {
+    border-color: var(--teamsync-primary) !important;
+    box-shadow: 0 0 0 2px var(--teamsync-primary-light) !important;
+}
+
+.slide-panel .current-slide {
+    border-color: var(--teamsync-primary) !important;
+}

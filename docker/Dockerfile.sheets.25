@@ -186,6 +186,12 @@ RUN fc-cache -fv
 # Copy source-built coolwsd binaries (with branding)
 COPY --from=coolwsd-builder /install/opt/cool/ /opt/cool/
 
+# Copy runtime branding files to browser directory
+# These are served at /browser/{version}/branding.css, etc.
+COPY docker/branding/sheets/branding.css /opt/cool/share/coolwsd/browser/dist/branding.css
+COPY docker/branding/sheets/branding.js /opt/cool/share/coolwsd/browser/dist/branding.js
+COPY docker/branding/sheets/branding-desktop.css /opt/cool/share/coolwsd/browser/dist/branding-desktop.css
+
 # Copy license notice
 COPY docker/branding/LICENSE_NOTICE.txt /opt/cool/LICENSE_NOTICE.txt
 

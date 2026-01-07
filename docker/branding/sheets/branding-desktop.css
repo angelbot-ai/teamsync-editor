@@ -1,0 +1,58 @@
+/* =============================================================================
+ * TeamSync Sheets - Desktop-specific Branding CSS
+ * Applied only on desktop/notebookbar view
+ * ============================================================================= */
+
+/* Notebookbar tab styling */
+.notebookbar .ui-tab.selected,
+.notebookbar-tabs-container .selected {
+    background-color: var(--teamsync-primary-lightest, #6ee7b7) !important;
+    border-bottom-color: var(--teamsync-primary, #059669) !important;
+}
+
+/* Desktop toolbar */
+#toolbar-up {
+    border-bottom-color: var(--teamsync-primary-light, #10b981) !important;
+}
+
+/* Desktop menu styling */
+.main-nav .has-submenu:hover,
+.main-nav .has-submenu.highlighted {
+    background-color: var(--teamsync-primary, #059669) !important;
+}
+
+/* Desktop sidebar */
+.sidebar-panel-header {
+    background-color: var(--teamsync-primary, #059669) !important;
+    color: #ffffff !important;
+}
+
+/* Desktop notebookbar groups */
+.notebookbar .unospan,
+.notebookbar .unolabel {
+    color: var(--teamsync-primary-dark, #047857);
+}
+
+/* Desktop context menu styling */
+.context-menu-item:hover,
+.context-menu-item.highlighted {
+    background-color: var(--teamsync-primary-lightest, #6ee7b7) !important;
+}
+
+/* Desktop scrollbar styling */
+::-webkit-scrollbar-thumb {
+    background-color: var(--teamsync-primary-light, #10b981);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background-color: var(--teamsync-primary, #059669);
+}
+
+/* Spreadsheet-specific desktop styles */
+.spreadsheet-tabs-container {
+    background-color: var(--teamsync-primary-lightest, #6ee7b7) !important;
+}
+
+.formula-bar {
+    border-color: var(--teamsync-primary-light, #10b981) !important;
+}
