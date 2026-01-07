@@ -334,12 +334,16 @@ const discoveryCache = new Map(); // url -> { urlPath, timestamp }
 const DISCOVERY_CACHE_TTL = 60 * 60 * 1000; // 1 hour
 
 async function fetchDiscovery(collaboraUrl) {
+    const startTime = Date.now();
     try {
+        console.log(`[Discovery] Fetching from ${collaboraUrl}/hosting/discovery`);
         const response = await fetch(`${collaboraUrl}/hosting/discovery`);
+        const elapsed = Date.now() - startTime;
         if (!response.ok) {
             throw new Error(`Discovery fetch failed: ${response.status}`);
         }
         const xml = await response.text();
+        console.log(`[Discovery] Fetched from ${collaboraUrl} in ${elapsed}ms`);
 
         // Parse the discovery XML to extract URL patterns
         const urlMatch = xml.match(/urlsrc="([^"]+cool\.html[^"]*)"/);
@@ -379,6 +383,7 @@ async function getCollaboraUrlPath(collaboraUrl) {
 }
 
 async function buildIframeSrc(fileId, accessToken, filename) {
+    const startTime = Date.now();
     // Determine which Collabora instance to use based on file type
     const docType = getDocumentType(filename);
 
@@ -387,7 +392,14 @@ async function buildIframeSrc(fileId, accessToken, filename) {
     // Use public URL for the browser iframe
     const collaboraPublicUrl = getCollaboraPublicUrlForType(docType);
 
+    console.log(`[Router] Building iframe for "${filename}" (${docType})`);
+    console.log(`[Router]   Internal URL: ${collaboraInternalUrl}`);
+    console.log(`[Router]   Public URL:   ${collaboraPublicUrl}`);
+
     const urlPath = await getCollaboraUrlPath(collaboraInternalUrl);
+    const discoveryElapsed = Date.now() - startTime;
+    console.log(`[Router]   Discovery lookup: ${discoveryElapsed}ms`);
+
     // Use wopiCallbackUrl for the WOPISrc - this is what Collabora (inside Docker) calls back to
     const wopiSrc = encodeURIComponent(`${config.wopiCallbackUrl}/wopi/files/${fileId}`);
 
@@ -468,16 +480,19 @@ app.get('/api/health', async (req, res) => {
         if (config.standaloneMode) {
             // Check all three Collabora instances
             const checkInstance = async (name, url) => {
+                const startTime = Date.now();
                 try {
                     console.log(`[Health] Checking ${name} at ${url}/hosting/discovery`);
                     const response = await fetch(`${url}/hosting/discovery`, {
-                        signal: AbortSignal.timeout(60000)
+                        signal: AbortSignal.timeout(5000)
                     });
+                    const elapsed = Date.now() - startTime;
                     const status = response.ok ? 'healthy' : 'not reachable';
-                    console.log(`[Health] ${name}: ${status} (HTTP ${response.status})`);
+                    console.log(`[Health] ${name}: ${status} (HTTP ${response.status}) - ${elapsed}ms`);
                     return status;
                 } catch (e) {
-                    console.log(`[Health] ${name}: not reachable (${e.message})`);
+                    const elapsed = Date.now() - startTime;
+                    console.log(`[Health] ${name}: not reachable (${e.message}) - ${elapsed}ms`);
                     return 'not reachable';
                 }
             };
@@ -574,9 +589,11 @@ app.post('/api/documents/upload', validateAppAuth, upload.single('file'), async 
  * This is the main integration point - your app calls this to get editor access
  */
 app.post('/api/documents/:fileId/token', validateAppAuth, async (req, res) => {
+    const startTime = Date.now();
     try {
         const { fileId } = req.params;
         const { permissions = 'edit' } = req.body;
+        console.log(`[API] Token request: fileId=${fileId} permissions=${permissions}`);
 
         // Verify document exists
         if (!localDocuments.has(fileId)) {
@@ -594,7 +611,8 @@ app.post('/api/documents/:fileId/token', validateAppAuth, async (req, res) => {
         // Determine document type for client info
         const docType = getDocumentType(doc.name);
 
-        console.log(`[API] Token issued: file=${fileId} (${docType}) user=${req.user.id} permissions=${permissions}`);
+        const elapsed = Date.now() - startTime;
+        console.log(`[API] Token issued: file=${fileId} (${docType}) user=${req.user.id} permissions=${permissions} - ${elapsed}ms`);
 
         res.json({
             accessToken,
@@ -603,7 +621,8 @@ app.post('/api/documents/:fileId/token', validateAppAuth, async (req, res) => {
             documentType: docType
         });
     } catch (error) {
-        console.error('[Token] Error:', error);
+        const elapsed = Date.now() - startTime;
+        console.error(`[Token] Error after ${elapsed}ms:`, error);
         res.status(500).json({ error: 'Failed to generate token' });
     }
 });
@@ -640,10 +659,14 @@ app.post('/api/auth/token', (req, res) => {
  * Called when Collabora opens a document
  */
 app.get('/wopi/files/:fileId', validateWopiToken, (req, res) => {
+    const startTime = Date.now();
     const { fileId } = req.params;
+    console.log(`[WOPI] CheckFileInfo request: fileId=${fileId}`);
+
     const doc = localDocuments.get(fileId);
 
     if (!doc) {
+        console.log(`[WOPI] CheckFileInfo: file not found - ${fileId}`);
         return res.status(404).json({ error: 'File not found' });
     }
 
@@ -652,6 +675,8 @@ app.get('/wopi/files/:fileId', validateWopiToken, (req, res) => {
 
     // Return WOPI CheckFileInfo response
     // See: https://docs.microsoft.com/en-us/microsoft-365/cloud-storage-partner-program/rest/files/checkfileinfo
+    const elapsed = Date.now() - startTime;
+    console.log(`[WOPI] CheckFileInfo: ${doc.name} (${doc.size} bytes) - ${elapsed}ms`);
     res.json({
         // Required properties
         BaseFileName: doc.name,
@@ -700,14 +725,19 @@ app.get('/wopi/files/:fileId', validateWopiToken, (req, res) => {
  * WOPI GetFile - Download file content
  */
 app.get('/wopi/files/:fileId/contents', validateWopiToken, (req, res) => {
+    const startTime = Date.now();
     const { fileId } = req.params;
+    console.log(`[WOPI] GetFile request: fileId=${fileId}`);
+
     const doc = localDocuments.get(fileId);
 
     if (!doc) {
+        console.log(`[WOPI] GetFile: file not found - ${fileId}`);
         return res.status(404).json({ error: 'File not found' });
     }
 
-    console.log(`[WOPI] GetFile: ${doc.name} (${doc.size} bytes)`);
+    const elapsed = Date.now() - startTime;
+    console.log(`[WOPI] GetFile: ${doc.name} (${doc.size} bytes) - ${elapsed}ms`);
 
     res.set({
         'Content-Type': 'application/octet-stream',

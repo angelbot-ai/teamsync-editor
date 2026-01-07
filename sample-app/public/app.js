@@ -455,7 +455,9 @@ class TeamSyncApp {
      * Open a document in the editor
      */
     async openDocument(doc) {
+        const openStartTime = performance.now();
         const docType = this.getDocumentType(doc.name);
+        console.log(`[DEBUG] Opening document: ${doc.name} (${docType})`);
 
         if (!this.isServiceAvailable(docType)) {
             const productInfo = this.getProductInfo(docType);
@@ -471,6 +473,8 @@ class TeamSyncApp {
             this.elements.currentDoc.textContent = `Editing: ${doc.name}`;
 
             // Get WOPI access token and iframe URL from the backend
+            console.log(`[DEBUG] Requesting token for ${doc.id}...`);
+            const tokenStartTime = performance.now();
             const response = await fetch(`${this.config.apiBaseUrl}/documents/${doc.id}/token`, {
                 method: 'POST',
                 headers: {
@@ -480,6 +484,8 @@ class TeamSyncApp {
                     permissions: 'edit'
                 })
             });
+            const tokenElapsed = (performance.now() - tokenStartTime).toFixed(0);
+            console.log(`[DEBUG] Token request completed in ${tokenElapsed}ms`);
 
             if (!response.ok) {
                 const error = await response.json();
@@ -487,6 +493,7 @@ class TeamSyncApp {
             }
 
             const { iframeSrc, accessToken, accessTokenTtl, documentType } = await response.json();
+            console.log(`[DEBUG] Token received, documentType: ${documentType}`);
 
             this.currentToken = {
                 token: accessToken,
@@ -503,7 +510,14 @@ class TeamSyncApp {
             this.elements.editorPlaceholder.classList.add('hidden');
             this.elements.editorHeader.classList.remove('hidden');
             this.elements.editorFrame.classList.remove('hidden');
+
+            console.log(`[DEBUG] Setting iframe src...`);
+            const iframeStartTime = performance.now();
             this.elements.editorFrame.src = iframeSrc;
+
+            const totalElapsed = (performance.now() - openStartTime).toFixed(0);
+            console.log(`[DEBUG] Document open initiated in ${totalElapsed}ms (iframe loading now...)`);
+            console.log(`[DEBUG] Iframe URL: ${iframeSrc.substring(0, 100)}...`);
 
             console.log(`Document opened: ${doc.name} (${documentType})`);
 
@@ -535,24 +549,31 @@ class TeamSyncApp {
     }
 
     processEditorMessage(message) {
+        const timestamp = new Date().toISOString().substr(11, 12);
         switch (message.MessageId) {
             case 'App_LoadingStatus':
-                console.log('Editor loading status:', message.Values?.Status);
+                console.log(`[DEBUG ${timestamp}] Editor loading status: ${message.Values?.Status}`);
+                if (message.Values?.Status === 'Document_Loaded') {
+                    console.log(`[DEBUG ${timestamp}] ✓ DOCUMENT FULLY LOADED`);
+                }
                 break;
             case 'Doc_ModifiedStatus':
-                console.log('Document modified:', message.Values?.Modified);
+                console.log(`[DEBUG ${timestamp}] Document modified: ${message.Values?.Modified}`);
                 break;
             case 'UI_Close':
-                console.log('Editor closed');
+                console.log(`[DEBUG ${timestamp}] Editor closed`);
                 this.closeDocument();
                 break;
             case 'Action_Save':
-                console.log('Document saved');
+                console.log(`[DEBUG ${timestamp}] Document saved`);
                 this.showSuccess('Document saved successfully');
+                break;
+            case 'UI_Ready':
+                console.log(`[DEBUG ${timestamp}] ✓ UI Ready`);
                 break;
             default:
                 if (message.MessageId) {
-                    console.log('Editor message:', message.MessageId, message.Values);
+                    console.log(`[DEBUG ${timestamp}] Editor message: ${message.MessageId}`, message.Values);
                 }
         }
     }
