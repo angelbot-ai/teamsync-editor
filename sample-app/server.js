@@ -52,11 +52,18 @@ const config = {
     collaboraSheetsUrl: process.env.COLLABORA_SHEETS_URL || process.env.COLLABORA_URL || 'http://localhost:9981',
     collaboraPresentationUrl: process.env.COLLABORA_PRESENTATION_URL || process.env.COLLABORA_URL || 'http://localhost:9982',
 
+    // TeamSync Editor - unified editor handling ALL document types (internal Docker network URL)
+    collaboraEditorUrl: process.env.COLLABORA_EDITOR_URL || 'http://localhost:9983',
+
     // PUBLIC URLs for browser access - these are what the browser iframe will use
     // When running in Docker, the browser needs localhost URLs to access the exposed ports
     collaboraDocumentPublicUrl: process.env.COLLABORA_DOCUMENT_PUBLIC_URL || 'http://localhost:9980',
     collaboraSheetsPublicUrl: process.env.COLLABORA_SHEETS_PUBLIC_URL || 'http://localhost:9981',
     collaboraPresentationPublicUrl: process.env.COLLABORA_PRESENTATION_PUBLIC_URL || 'http://localhost:9982',
+    collaboraEditorPublicUrl: process.env.COLLABORA_EDITOR_PUBLIC_URL || 'http://localhost:9983',
+
+    // Use unified editor mode - routes ALL documents to TeamSync Editor instead of separate services
+    useUnifiedEditor: process.env.USE_UNIFIED_EDITOR === 'true',
 
     // This sample app's public URL (for browser access)
     publicUrl: process.env.PUBLIC_URL || 'http://localhost:8080',
@@ -281,6 +288,11 @@ function getDocumentType(filename) {
  * Used for server-to-server communication (health checks, discovery)
  */
 function getCollaboraUrlForType(docType) {
+    // If unified editor mode is enabled, route ALL documents to TeamSync Editor
+    if (config.useUnifiedEditor) {
+        return config.collaboraEditorUrl;
+    }
+
     switch (docType) {
         case 'spreadsheet':
             return config.collaboraSheetsUrl;
@@ -297,6 +309,11 @@ function getCollaboraUrlForType(docType) {
  * Used for building the iframe src that the browser will load
  */
 function getCollaboraPublicUrlForType(docType) {
+    // If unified editor mode is enabled, route ALL documents to TeamSync Editor
+    if (config.useUnifiedEditor) {
+        return config.collaboraEditorPublicUrl;
+    }
+
     switch (docType) {
         case 'spreadsheet':
             return config.collaboraSheetsPublicUrl;
@@ -465,28 +482,33 @@ app.get('/api/health', async (req, res) => {
                 }
             };
 
-            const [docStatus, sheetsStatus, presentationStatus] = await Promise.all([
+            const [docStatus, sheetsStatus, presentationStatus, editorStatus] = await Promise.all([
                 checkInstance('document', config.collaboraDocumentUrl),
                 checkInstance('sheets', config.collaboraSheetsUrl),
-                checkInstance('presentation', config.collaboraPresentationUrl)
+                checkInstance('presentation', config.collaboraPresentationUrl),
+                checkInstance('editor', config.collaboraEditorUrl)
             ]);
 
-            const allHealthy = docStatus === 'healthy' &&
-                               sheetsStatus === 'healthy' &&
-                               presentationStatus === 'healthy';
+            // In unified mode, only editor needs to be healthy
+            // In multi-variant mode, all specialized editors should be healthy
+            const allHealthy = config.useUnifiedEditor
+                ? editorStatus === 'healthy'
+                : (docStatus === 'healthy' && sheetsStatus === 'healthy' && presentationStatus === 'healthy');
             const anyHealthy = docStatus === 'healthy' ||
                                sheetsStatus === 'healthy' ||
-                               presentationStatus === 'healthy';
+                               presentationStatus === 'healthy' ||
+                               editorStatus === 'healthy';
 
             return res.json({
                 status: allHealthy ? 'healthy' : (anyHealthy ? 'partial' : 'degraded'),
-                mode: 'standalone',
+                mode: config.useUnifiedEditor ? 'unified-editor' : 'multi-variant',
                 timestamp: new Date().toISOString(),
                 services: {
                     sampleApp: 'healthy',
                     'teamsync-document': docStatus,
                     'teamsync-sheets': sheetsStatus,
-                    'teamsync-presentation': presentationStatus
+                    'teamsync-presentation': presentationStatus,
+                    'teamsync-editor': editorStatus
                 }
             });
         }
@@ -854,10 +876,11 @@ app.listen(PORT, () => {
 ║                                                                ║
 ╚════════════════════════════════════════════════════════════════╝
 
-Collabora Instances (Multi-Variant Mode):
+Collabora Instances:
   - Document:     ${config.collaboraDocumentUrl}
   - Sheets:       ${config.collaboraSheetsUrl}
   - Presentation: ${config.collaboraPresentationUrl}
+  - Editor:       ${config.collaboraEditorUrl} ${config.useUnifiedEditor ? '(ACTIVE - unified mode)' : ''}
 
 Authentication:
   - JWT Secret: ${config.jwtSecret.slice(0, 10)}... (${config.jwtSecret.length} chars)
@@ -868,12 +891,21 @@ Documents loaded: ${Array.from(localDocuments.keys()).join(', ') || 'none'}
 `);
 
     if (config.standaloneMode) {
-        console.log('[Multi-Variant Mode] This sample app routes documents to the appropriate editor:');
-        console.log('  .docx/.doc/.odt -> TeamSync Document (port 9980)');
-        console.log('  .xlsx/.xls/.ods -> TeamSync Sheets (port 9981)');
-        console.log('  .pptx/.ppt/.odp -> TeamSync Presentation (port 9982)');
-        console.log('\nMake sure all TeamSync containers are running:');
-        console.log('  docker-compose -f docker-compose.multi.yml up -d\n');
+        if (config.useUnifiedEditor) {
+            console.log('[Unified Editor Mode] All documents routed to TeamSync Editor:');
+            console.log('  .docx/.doc/.odt/.xlsx/.xls/.ods/.pptx/.ppt/.odp -> TeamSync Editor (port 9983)');
+            console.log('\nMake sure TeamSync Editor is running:');
+            console.log('  docker-compose -f docker-compose.editor.yml up -d\n');
+        } else {
+            console.log('[Multi-Variant Mode] Documents routed to specialized editors:');
+            console.log('  .docx/.doc/.odt -> TeamSync Document (port 9980)');
+            console.log('  .xlsx/.xls/.ods -> TeamSync Sheets (port 9981)');
+            console.log('  .pptx/.ppt/.odp -> TeamSync Presentation (port 9982)');
+            console.log('\nMake sure all TeamSync containers are running:');
+            console.log('  docker-compose -f docker-compose.multi.yml up -d');
+            console.log('\nOr use unified editor (USE_UNIFIED_EDITOR=true) with:');
+            console.log('  docker-compose -f docker-compose.editor.yml up -d\n');
+        }
     }
 });
 
