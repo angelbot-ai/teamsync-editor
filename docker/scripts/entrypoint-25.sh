@@ -44,34 +44,33 @@ echo "==========================================="
 # =============================================================================
 # Configuration
 # =============================================================================
-# Use /opt/cool/etc for config (writable by cool user) or fall back to /etc/coolwsd
-if [ -w "/opt/cool/etc" ] || mkdir -p /opt/cool/etc 2>/dev/null; then
-    CONFIG_DIR="/opt/cool/etc/coolwsd"
+# Find the config file from package installation
+if [ -f "/etc/coolwsd/coolwsd.xml" ]; then
+    SOURCE_CONFIG="/etc/coolwsd/coolwsd.xml"
+elif [ -f "/usr/share/coolwsd/coolwsd.xml" ]; then
+    SOURCE_CONFIG="/usr/share/coolwsd/coolwsd.xml"
+elif [ -f "/opt/cool/etc/coolwsd/coolwsd.xml" ]; then
+    SOURCE_CONFIG="/opt/cool/etc/coolwsd/coolwsd.xml"
 else
-    CONFIG_DIR="/etc/coolwsd"
+    SOURCE_CONFIG=""
 fi
-CONFIG_FILE="${CONFIG_DIR}/coolwsd.xml"
+
+# Always copy config to /tmp for modification (cool user can write there)
+if [ -n "$SOURCE_CONFIG" ]; then
+    cp "$SOURCE_CONFIG" /tmp/coolwsd.xml 2>/dev/null || true
+    CONFIG_FILE="/tmp/coolwsd.xml"
+else
+    CONFIG_FILE=""
+fi
+
 LISTEN_PORT="${PORT:-9980}"
 
 echo "[1/4] Checking configuration..."
 
-# Create config file if it doesn't exist (source build may not have it)
-if [ ! -f "$CONFIG_FILE" ]; then
-    echo "  Creating default configuration..."
-    mkdir -p "$CONFIG_DIR" 2>/dev/null || true
-
-    # Check if template exists from coolwsd-deprecated package
-    if [ -f "/usr/share/coolwsd/coolwsd.xml" ]; then
-        cp /usr/share/coolwsd/coolwsd.xml "$CONFIG_FILE" 2>/dev/null || echo "  Note: Using command-line config only"
-    elif [ -f "/opt/cool/etc/coolwsd/coolwsd.xml" ]; then
-        cp /opt/cool/etc/coolwsd/coolwsd.xml "$CONFIG_FILE" 2>/dev/null || echo "  Note: Using command-line config only"
-    elif [ -f "/etc/coolwsd/coolwsd.xml" ]; then
-        # Config already exists in system location
-        CONFIG_FILE="/etc/coolwsd/coolwsd.xml"
-    else
-        echo "  Note: No config template found, using command-line config only"
-        CONFIG_FILE=""
-    fi
+# Create minimal config if no template found
+if [ -z "$CONFIG_FILE" ] || [ ! -f "$CONFIG_FILE" ]; then
+    echo "  Note: No config template found, using command-line config only"
+    CONFIG_FILE=""
 fi
 
 # =============================================================================
@@ -84,35 +83,35 @@ fi
 if [ -n "$CONFIG_FILE" ] && [ -f "$CONFIG_FILE" ]; then
     echo "  Patching config for cloud platform compatibility..."
 
-    # Create a writable copy if needed
-    if [ ! -w "$CONFIG_FILE" ]; then
-        cp "$CONFIG_FILE" /tmp/coolwsd.xml 2>/dev/null || true
-        if [ -f "/tmp/coolwsd.xml" ]; then
-            CONFIG_FILE="/tmp/coolwsd.xml"
-        fi
-    fi
-
-    # Patch mount_jail_tree to false (disable bind-mount based jail)
+    # Patch or add mount_jail_tree to false (disable bind-mount based jail)
     if grep -q "<mount_jail_tree>" "$CONFIG_FILE" 2>/dev/null; then
         sed -i 's|<mount_jail_tree>[^<]*</mount_jail_tree>|<mount_jail_tree>false</mount_jail_tree>|g' "$CONFIG_FILE" 2>/dev/null || true
+    else
+        sed -i 's|</config>|    <mount_jail_tree>false</mount_jail_tree>\n</config>|' "$CONFIG_FILE" 2>/dev/null || true
     fi
 
-    # Patch mount_namespaces to false (disable mount namespaces)
+    # Patch or add mount_namespaces to false (disable mount namespaces)
     if grep -q "<mount_namespaces>" "$CONFIG_FILE" 2>/dev/null; then
         sed -i 's|<mount_namespaces>[^<]*</mount_namespaces>|<mount_namespaces>false</mount_namespaces>|g' "$CONFIG_FILE" 2>/dev/null || true
+    else
+        sed -i 's|</config>|    <mount_namespaces>false</mount_namespaces>\n</config>|' "$CONFIG_FILE" 2>/dev/null || true
     fi
 
-    # Patch security.seccomp to false
+    # Patch or add security.seccomp to false
     if grep -q "<seccomp>" "$CONFIG_FILE" 2>/dev/null; then
         sed -i 's|<seccomp>[^<]*</seccomp>|<seccomp>false</seccomp>|g' "$CONFIG_FILE" 2>/dev/null || true
+    else
+        sed -i 's|</config>|    <seccomp>false</seccomp>\n</config>|' "$CONFIG_FILE" 2>/dev/null || true
     fi
 
-    # Patch security.capabilities to false (Railway doesn't support Linux capabilities)
+    # Patch or add security.capabilities to false (Railway doesn't support Linux capabilities)
     if grep -q "<capabilities>" "$CONFIG_FILE" 2>/dev/null; then
         sed -i 's|<capabilities>[^<]*</capabilities>|<capabilities>false</capabilities>|g' "$CONFIG_FILE" 2>/dev/null || true
+    else
+        sed -i 's|</config>|    <capabilities>false</capabilities>\n</config>|' "$CONFIG_FILE" 2>/dev/null || true
     fi
 
-    echo "  Config patched successfully"
+    echo "  Config patched: mount_jail_tree=false, mount_namespaces=false, seccomp=false, capabilities=false"
 fi
 
 # =============================================================================
@@ -238,12 +237,19 @@ echo ""
 # =============================================================================
 # Start coolwsd
 # =============================================================================
-# Try source-built binary first, fall back to package binary
+# Determine which installation type: source-built vs package
 if [ -x "/opt/cool/bin/coolwsd" ]; then
-    exec /opt/cool/bin/coolwsd "${COOLWSD_ARGS[@]}"
+    COOLWSD_BIN="/opt/cool/bin/coolwsd"
+    # file_server_root_path already set to /opt/cool/share/coolwsd
 elif [ -x "/usr/bin/coolwsd" ]; then
-    exec /usr/bin/coolwsd "${COOLWSD_ARGS[@]}"
+    COOLWSD_BIN="/usr/bin/coolwsd"
+    # Package install uses /usr/share/coolwsd for browser files
+    # Override file_server_root_path for package installations
+    COOLWSD_ARGS+=("--o:file_server_root_path=/usr/share/coolwsd")
 else
     echo "ERROR: coolwsd binary not found!"
     exit 1
 fi
+
+echo "  Binary: $COOLWSD_BIN"
+exec "$COOLWSD_BIN" "${COOLWSD_ARGS[@]}"
