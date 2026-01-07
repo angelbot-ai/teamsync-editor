@@ -75,6 +75,42 @@ if [ ! -f "$CONFIG_FILE" ]; then
 fi
 
 # =============================================================================
+# CRITICAL: Patch coolwsd.xml config file for Railway/cloud compatibility
+# =============================================================================
+# These settings MUST be in the XML config file, not just command-line,
+# because coolwsd reads the config and tries to initialize mount namespaces
+# BEFORE command-line overrides take effect.
+
+if [ -n "$CONFIG_FILE" ] && [ -f "$CONFIG_FILE" ]; then
+    echo "  Patching config for cloud platform compatibility..."
+
+    # Create a writable copy if needed
+    if [ ! -w "$CONFIG_FILE" ]; then
+        cp "$CONFIG_FILE" /tmp/coolwsd.xml 2>/dev/null || true
+        if [ -f "/tmp/coolwsd.xml" ]; then
+            CONFIG_FILE="/tmp/coolwsd.xml"
+        fi
+    fi
+
+    # Patch mount_jail_tree to false (disable bind-mount based jail)
+    if grep -q "<mount_jail_tree>" "$CONFIG_FILE" 2>/dev/null; then
+        sed -i 's|<mount_jail_tree>[^<]*</mount_jail_tree>|<mount_jail_tree>false</mount_jail_tree>|g' "$CONFIG_FILE" 2>/dev/null || true
+    fi
+
+    # Patch mount_namespaces to false (disable mount namespaces)
+    if grep -q "<mount_namespaces>" "$CONFIG_FILE" 2>/dev/null; then
+        sed -i 's|<mount_namespaces>[^<]*</mount_namespaces>|<mount_namespaces>false</mount_namespaces>|g' "$CONFIG_FILE" 2>/dev/null || true
+    fi
+
+    # Patch security.seccomp to false
+    if grep -q "<seccomp>" "$CONFIG_FILE" 2>/dev/null; then
+        sed -i 's|<seccomp>[^<]*</seccomp>|<seccomp>false</seccomp>|g' "$CONFIG_FILE" 2>/dev/null || true
+    fi
+
+    echo "  Config patched successfully"
+fi
+
+# =============================================================================
 # Configure SSL
 # =============================================================================
 echo "[2/4] Configuring SSL..."
@@ -121,6 +157,8 @@ echo "  Listening on port: $LISTEN_PORT"
 
 COOLWSD_ARGS=(
     "--port=${LISTEN_PORT}"
+    "--version"
+    "--use-env-vars"
     "--disable-cool-user-checking"
     "--o:sys_template_path=/opt/cool/systemplate"
     "--o:child_root_path=/opt/cool/child-roots"
