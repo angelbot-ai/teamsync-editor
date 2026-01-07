@@ -706,6 +706,7 @@ app.get('/wopi/files/:fileId', validateWopiToken, (req, res) => {
 
         // Status
         IsAnonymousUser: false,
+        IsAdminUser: false,
         ReadOnly: !canWrite,
         RestrictedWebViewOnly: false,
         LastModifiedTime: doc.lastModified,

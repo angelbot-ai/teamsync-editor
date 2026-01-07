@@ -517,6 +517,27 @@ class TeamSyncApp {
 
             console.log(`[DEBUG] Setting iframe src...`);
             const iframeStartTime = performance.now();
+
+            // Set up onload handler to send PostMessage ready notification
+            this.elements.editorFrame.onload = () => {
+                const iframeLoadTime = (performance.now() - iframeStartTime).toFixed(0);
+                console.log(`[DEBUG] Iframe loaded in ${iframeLoadTime}ms, sending Host_PostmessageReady`);
+
+                // Notify the editor that we're ready to receive PostMessage calls
+                // This resolves the "Integrator is not ready for PostMessage calls" audit warning
+                try {
+                    this.elements.editorFrame.contentWindow.postMessage(
+                        JSON.stringify({
+                            MessageId: 'Host_PostmessageReady'
+                        }),
+                        '*'
+                    );
+                    console.log(`[DEBUG] Host_PostmessageReady sent to editor`);
+                } catch (e) {
+                    console.warn(`[DEBUG] Could not send PostMessage to iframe:`, e.message);
+                }
+            };
+
             this.elements.editorFrame.src = iframeSrc;
 
             const totalElapsed = (performance.now() - openStartTime).toFixed(0);
