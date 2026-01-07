@@ -2,7 +2,7 @@
 # TeamSync Editor - Multi-Variant Docker Compose
 # =============================================================================
 #
-# This docker-compose file runs all three TeamSync variants simultaneously
+# This docker-compose file runs all four TeamSync variants simultaneously
 # for testing purposes.
 #
 # REQUIRED: Create a .env file with the following variables before running:
@@ -23,6 +23,7 @@
 #   - 9980: TeamSync Document (Word processor)
 #   - 9981: TeamSync Sheets (Spreadsheet)
 #   - 9982: TeamSync Presentation
+#   - 9983: TeamSync Editor (Full-featured, all document types)
 #   - 8080: Sample Application (WOPI host)
 #
 # =============================================================================
@@ -130,6 +131,47 @@ services:
     security_opt:
       - seccomp:unconfined
       - apparmor:unconfined
+    networks:
+      - teamsync-network
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "--max-time", "30", "http://localhost:9980/hosting/discovery"]
+      interval: 60s
+      timeout: 60s
+      start_period: 300s
+      retries: 10
+    restart: unless-stopped
+
+  # ===========================================================================
+  # TeamSync Editor - Full-Featured Editor (All Document Types)
+  # Handles: .docx, .doc, .odt, .xlsx, .xls, .ods, .pptx, .ppt, .odp, etc.
+  # ===========================================================================
+  teamsync-editor:
+    image: teamsync-editor:latest
+    container_name: teamsync-editor
+    ports:
+      - "9983:9980"
+    environment:
+      - TEAMSYNC_PRODUCT=editor
+      - SSL_ENABLE=false
+      - SSL_TERMINATION=true
+      - LOG_LEVEL=${LOG_LEVEL:-warning}
+      - COOL_ADMIN_USER=${COOL_ADMIN_USER:-}
+      - COOL_ADMIN_PASSWORD=${COOL_ADMIN_PASSWORD:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    cap_add:
+      - MKNOD
+      - SYS_CHROOT
+      - FOWNER
+      - CHOWN
+      - SYS_ADMIN
+    security_opt:
+      - seccomp:unconfined
+      - apparmor:unconfined
+    ulimits:
+      nofile:
+        soft: 100000
+        hard: 100000
     networks:
       - teamsync-network
     healthcheck:

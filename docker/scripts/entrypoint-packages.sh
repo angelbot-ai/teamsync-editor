@@ -56,8 +56,13 @@ fi
 # TeamSync-specific configuration
 # =============================================================================
 
+# Determine product name from environment (default: Editor)
+PRODUCT_DISPLAY_NAME="TeamSync ${TEAMSYNC_PRODUCT:-Editor}"
+# Capitalize first letter of product name
+PRODUCT_DISPLAY_NAME=$(echo "$PRODUCT_DISPLAY_NAME" | sed 's/\b\(.\)/\u\1/g')
+
 echo "==========================================="
-echo "TeamSync Document - Starting..."
+echo "${PRODUCT_DISPLAY_NAME} - Starting..."
 echo "==========================================="
 
 # Use PORT env var if set (Railway, Render, etc.), otherwise default to 9980

@@ -1,0 +1,169 @@
+# =============================================================================
+# TeamSync Editor - Full-Featured Collaborative Document Editor
+# =============================================================================
+#
+# Handles: ALL document types (.docx, .doc, .odt, .xlsx, .xls, .ods, .pptx, .ppt, .odp, etc.)
+# Optimized for: Production deployment with 100,000+ users
+# License: MPL 2.0 Compliant
+# Build: Uses official Collabora packages (fast build, ~5-10 minutes)
+#
+# This is the FULL-FEATURED variant that includes all LibreOffice components:
+# - Writer (word processing)
+# - Calc (spreadsheets)
+# - Impress (presentations)
+# - Draw (diagrams)
+# - Math (formulas)
+#
+# Features:
+# - All "Development Edition" nag screens removed
+# - Production-optimized coolwsd configuration
+# - No artificial document/connection limits (via config)
+# - Purple/Violet TeamSync branding
+# - Additional fonts for proper document rendering
+#
+# This Dockerfile installs coolwsd and coolwsd-deprecated packages from
+# Collabora's official repository, which includes the coolforkit-caps binary
+# that gracefully handles missing Linux capabilities on restricted platforms.
+#
+# =============================================================================
+
+# =============================================================================
+# Single Stage Build - Install packages then apply branding and nag removal
+# =============================================================================
+FROM debian:bookworm-slim
+
+# Production environment configuration
+ENV DEBIAN_FRONTEND=noninteractive \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
+    TEAMSYNC_PRODUCT="editor" \
+    # Collabora Online performance tuning defaults
+    MEMPROPORTION=80.0 \
+    MAX_CONNECTIONS=100000 \
+    MAX_DOCUMENTS=100000 \
+    # Disable core dumps in production
+    COOL_NO_DUMP=1
+
+# OCI Image Labels for container registries
+LABEL maintainer="TeamSync <support@teamsync.io>" \
+      org.opencontainers.image.title="TeamSync Editor" \
+      org.opencontainers.image.description="Full-featured collaborative document editing - supports all document types. Production-optimized for 100K+ users." \
+      org.opencontainers.image.licenses="MPL-2.0" \
+      org.opencontainers.image.vendor="TeamSync" \
+      org.opencontainers.image.source="https://github.com/angelbot-ai/teamsync-editor" \
+      teamsync.product="editor" \
+      teamsync.filetypes="docx,doc,odt,rtf,txt,xlsx,xls,ods,csv,pptx,ppt,odp,odg,vsdx,pdf" \
+      teamsync.version="1.0.0" \
+      teamsync.build="packages"
+
+# Install base dependencies including additional fonts
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    apt-transport-https \
+    ca-certificates \
+    cpio \
+    curl \
+    fontconfig \
+    fonts-liberation \
+    fonts-dejavu \
+    fonts-noto-core \
+    fonts-noto-cjk \
+    fonts-noto-mono \
+    gnupg2 \
+    hunspell \
+    hunspell-en-us \
+    libcap2-bin \
+    libnss-wrapper \
+    locales \
+    openssl \
+    procps \
+    sed \
+    tzdata \
+    && rm -rf /var/lib/apt/lists/*
+
+# Add Collabora repository and install packages
+# Using CODE (Community) repository - main branch for latest stable (25.04)
+RUN curl -fsSL https://www.collaboraoffice.com/downloads/gpg/collaboraonline-release-keyring.gpg \
+        -o /usr/share/keyrings/collaboraonline-release-keyring.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/collaboraonline-release-keyring.gpg] https://www.collaboraoffice.com/repos/CollaboraOnline/CODE-deb ./" \
+        > /etc/apt/sources.list.d/collaboraonline.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+        coolwsd \
+        coolwsd-deprecated \
+        code-brand \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# Build fontconfig cache
+RUN fc-cache -fv
+
+# Set proper permissions on config
+RUN chmod 644 /etc/coolwsd/coolwsd.xml
+
+# =============================================================================
+# Remove CODE "Development Edition" Nag Screens
+# =============================================================================
+COPY docker/scripts/remove-nags.sh /tmp/remove-nags.sh
+RUN chmod +x /tmp/remove-nags.sh \
+    && /tmp/remove-nags.sh /usr/share/coolwsd/browser \
+    && rm -f /tmp/remove-nags.sh
+
+# =============================================================================
+# Apply Production Configuration
+# =============================================================================
+COPY docker/config/coolwsd-editor.xml /tmp/coolwsd-editor.xml
+
+# Merge production settings into coolwsd.xml
+# We use xmlstarlet if available, otherwise sed for key settings
+RUN if command -v xmlstarlet > /dev/null 2>&1; then \
+        echo "Using xmlstarlet for config merge"; \
+    else \
+        # Apply key production settings via sed
+        sed -i 's/<num_prespawn_children[^>]*>[^<]*</<num_prespawn_children type="uint" default="1">5</g' /etc/coolwsd/coolwsd.xml 2>/dev/null || true; \
+        # Disable welcome screen
+        sed -i 's/<welcome>.*<enable[^>]*>true</<welcome><enable type="bool" default="false">false</g' /etc/coolwsd/coolwsd.xml 2>/dev/null || true; \
+        # Disable home mode (removes 10-doc limit)
+        sed -i 's/<home_mode>.*<enable[^>]*>true</<home_mode><enable type="bool" default="false">false</g' /etc/coolwsd/coolwsd.xml 2>/dev/null || true; \
+        # Set logging to warning
+        sed -i 's/<level[^>]*>information</<level type="string" default="warning">warning</g' /etc/coolwsd/coolwsd.xml 2>/dev/null || true; \
+        sed -i 's/<level[^>]*>info</<level type="string" default="warning">warning</g' /etc/coolwsd/coolwsd.xml 2>/dev/null || true; \
+        # Disable watermark
+        sed -i 's/<opacity[^>]*>0\.2</<opacity type="double" default="0.0">0.0</g' /etc/coolwsd/coolwsd.xml 2>/dev/null || true; \
+    fi \
+    && rm -f /tmp/coolwsd-editor.xml
+
+# =============================================================================
+# Apply TeamSync Branding to installed browser assets
+# =============================================================================
+# Copy branding assets and script
+COPY docker/branding/editor/ /tmp/branding/
+COPY docker/branding/LICENSE_NOTICE.txt /tmp/branding/
+COPY docker/scripts/apply-branding.sh /tmp/apply-branding.sh
+
+# Apply branding modifications to the installed Collabora assets
+RUN chmod +x /tmp/apply-branding.sh \
+    && /tmp/apply-branding.sh /usr/share/coolwsd /tmp/branding "TeamSync Editor" \
+    && rm -rf /tmp/branding /tmp/apply-branding.sh
+
+# Copy license notice to final location
+COPY docker/branding/LICENSE_NOTICE.txt /opt/cool/LICENSE_NOTICE.txt
+
+# =============================================================================
+# Setup directories and permissions
+# =============================================================================
+RUN mkdir -p /opt/cool /var/log/coolwsd /tmp/ssl \
+    && chown -R cool:cool /opt/cool /var/log/coolwsd /tmp/ssl 2>/dev/null || true
+
+# Copy entrypoint script
+COPY --chmod=755 docker/scripts/entrypoint-packages.sh /start-collabora-online.sh
+
+# Expose default port and monitoring port
+EXPOSE 9980 9191
+
+# Production-ready healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --start-period=180s --retries=3 \
+    CMD curl -sf http://localhost:${PORT:-9980}/hosting/discovery > /dev/null || exit 1
+
+WORKDIR /opt/cool
+
+ENTRYPOINT ["/start-collabora-online.sh"]

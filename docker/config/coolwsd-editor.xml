@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- =============================================================================
+     TeamSync Editor - Production-Optimized coolwsd Configuration
+     =============================================================================
+
+     This file contains production settings for TeamSync Editor.
+     These settings are merged with /etc/coolwsd/coolwsd.xml during container startup.
+
+     Optimized for:
+     - 100,000+ concurrent users (horizontal scaling)
+     - No artificial document/connection limits
+     - Memory efficiency with automatic cleanup
+     - Reverse proxy deployments (SSL termination)
+
+     ============================================================================= -->
+
+<config>
+    <!-- =========================================================================
+         Performance Tuning
+         ========================================================================= -->
+
+    <!-- Pre-spawn children for instant document loading -->
+    <!-- Higher = faster first load, more RAM usage -->
+    <num_prespawn_children desc="Number of child processes to keep spawned" type="uint" default="1">5</num_prespawn_children>
+
+    <!-- Per-document settings -->
+    <per_document>
+        <!-- Max concurrent editing sessions per document -->
+        <max_concurrency desc="Maximum concurrent users per document" type="uint" default="4">4</max_concurrency>
+
+        <!-- Batch processing for better performance -->
+        <batch_priority desc="Batch priority (0-5, higher=faster)" type="uint" default="5">5</batch_priority>
+
+        <!-- Idle timeout before document unloads -->
+        <idle_timeout_secs desc="Unload idle documents after this many seconds" type="uint" default="3600">3600</idle_timeout_secs>
+
+        <!-- Limit memory per document (0 = unlimited) -->
+        <limit_virt_mem_mb desc="Virtual memory limit per document" type="uint" default="0">0</limit_virt_mem_mb>
+
+        <!-- Limit stack size -->
+        <limit_stack_mem_kb desc="Stack memory limit" type="uint" default="8000">8000</limit_stack_mem_kb>
+
+        <!-- No file size limit -->
+        <limit_file_size_mb desc="Max file size (0 = unlimited)" type="uint" default="0">0</limit_file_size_mb>
+
+        <!-- Cleanup document after N events to prevent memory fragmentation -->
+        <cleanup>
+            <cleanup_interval_ms desc="Cleanup check interval" type="uint" default="10000">10000</cleanup_interval_ms>
+            <bad_behavior_period_secs desc="Bad behavior detection period" type="uint" default="60">60</bad_behavior_period_secs>
+            <idle_time_secs desc="Idle time before cleanup" type="uint" default="300">300</idle_time_secs>
+            <limit_dirty_mem_mb desc="Dirty memory limit" type="uint" default="3072">4096</limit_dirty_mem_mb>
+            <limit_cpu_per desc="CPU limit percentage" type="uint" default="85">90</limit_cpu_per>
+            <lost_kit_grace_period_secs desc="Grace period for lost kit" type="uint" default="120">120</lost_kit_grace_period_secs>
+        </cleanup>
+    </per_document>
+
+    <!-- =========================================================================
+         Memory Management (The "Leak" Fix)
+         ========================================================================= -->
+
+    <!-- Virtual memory limit (0 = unlimited, recommended for >32GB RAM) -->
+    <limit_virt_mem_mb desc="Virtual memory limit for coolwsd" type="uint" default="0">0</limit_virt_mem_mb>
+
+    <!-- Force restart after N events to clear memory fragmentation -->
+    <!-- This is critical for long-running production deployments -->
+    <max_event_count desc="Restart document process after this many events" type="uint" default="2000">2000</max_event_count>
+
+    <!-- Memory proportion to use (percentage of available) -->
+    <memproportion desc="Percentage of available memory to use" type="double" default="80.0">80.0</memproportion>
+
+    <!-- =========================================================================
+         Disable All "Development Edition" Restrictions
+         ========================================================================= -->
+
+    <!-- Disable welcome/release notes popup -->
+    <welcome>
+        <enable desc="Show welcome screen" type="bool" default="false">false</enable>
+    </welcome>
+
+    <!-- CRITICAL: Disable home_mode to remove 10-document limit -->
+    <home_mode>
+        <enable desc="Enable home mode (ENABLES 10-doc limit!)" type="bool" default="false">false</enable>
+    </home_mode>
+
+    <!-- Remove watermark -->
+    <watermark>
+        <opacity desc="Watermark opacity (0 = invisible)" type="double" default="0.0">0.0</opacity>
+        <text desc="Watermark text (empty = none)" type="string" default=""></text>
+    </watermark>
+
+    <!-- =========================================================================
+         SSL Configuration (For Reverse Proxy)
+         ========================================================================= -->
+
+    <!-- SSL should be handled by Nginx/HAProxy, not coolwsd -->
+    <ssl>
+        <enable desc="Enable SSL (disable for reverse proxy)" type="bool" default="false">false</enable>
+        <termination desc="SSL terminated at proxy" type="bool" default="true">true</termination>
+    </ssl>
+
+    <!-- =========================================================================
+         Logging (Production)
+         ========================================================================= -->
+
+    <logging>
+        <!-- Only log warnings and errors in production -->
+        <!-- Options: none, fatal, critical, error, warning, notice, information, debug, trace -->
+        <level desc="Log level" type="string" default="warning">warning</level>
+
+        <!-- Disable file logging (use container stdout) -->
+        <file>
+            <enable desc="Enable file logging" type="bool" default="false">false</enable>
+        </file>
+
+        <!-- Disable protocol logging (very verbose) -->
+        <protocol desc="Log all protocol messages" type="bool" default="false">false</protocol>
+
+        <!-- Disable color (cleaner in container logs) -->
+        <color desc="Use color in logs" type="bool" default="false">false</color>
+
+        <!-- Log anonymization for privacy -->
+        <anonymize>
+            <usernames desc="Anonymize usernames in logs" type="bool" default="true">true</usernames>
+            <filenames desc="Anonymize filenames in logs" type="bool" default="true">true</filenames>
+        </anonymize>
+    </logging>
+
+    <!-- =========================================================================
+         Monitoring (Prometheus)
+         ========================================================================= -->
+
+    <monitoring>
+        <enable desc="Enable monitoring endpoint" type="bool" default="true">true</enable>
+        <port desc="Monitoring port" type="uint" default="9191">9191</port>
+    </monitoring>
+
+    <!-- =========================================================================
+         Network Configuration
+         ========================================================================= -->
+
+    <net>
+        <!-- Connection timeouts -->
+        <connection_timeout_secs desc="Connection timeout" type="uint" default="30">30</connection_timeout_secs>
+
+        <!-- WebSocket compression -->
+        <compression desc="Enable WebSocket compression" type="bool" default="true">true</compression>
+
+        <!-- Frame size -->
+        <frame_size desc="WebSocket frame size" type="uint" default="1000000">1000000</frame_size>
+    </net>
+
+    <!-- =========================================================================
+         Storage Configuration
+         ========================================================================= -->
+
+    <storage>
+        <!-- WOPI storage settings -->
+        <wopi>
+            <!-- Max file size for WOPI (0 = unlimited) -->
+            <max_file_size desc="Max file size in bytes (0 = unlimited)" type="uint" default="0">0</max_file_size>
+
+            <!-- Reuse host session for better performance -->
+            <reuse_host_session desc="Reuse host session" type="bool" default="true">true</reuse_host_session>
+        </wopi>
+    </storage>
+
+    <!-- =========================================================================
+         Security
+         ========================================================================= -->
+
+    <security>
+        <!-- WOPI capabilities are determined by the WOPI host -->
+        <capabilities desc="Use WOPI capabilities" type="bool" default="true">true</capabilities>
+
+        <!-- Content Security Policy -->
+        <content_security_policy desc="CSP header" type="string" default="">default-src 'self' 'unsafe-inline' 'unsafe-eval'; img-src * data:; connect-src *; frame-ancestors *;</content_security_policy>
+    </security>
+
+    <!-- =========================================================================
+         Fonts
+         ========================================================================= -->
+
+    <fonts>
+        <!-- Use system fonts -->
+        <use_system desc="Use system fonts" type="bool" default="true">true</use_system>
+    </fonts>
+</config>

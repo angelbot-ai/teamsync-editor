@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 50" width="200" height="50">
+  <defs>
+    <linearGradient id="editorGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#7c3aed"/>
+      <stop offset="100%" style="stop-color:#6d28d9"/>
+    </linearGradient>
+  </defs>
+  <!-- Icon: Multi-document stack (represents all document types) -->
+  <rect x="12" y="10" width="24" height="32" rx="2" fill="#a78bfa" opacity="0.6"/>
+  <rect x="8" y="6" width="24" height="32" rx="2" fill="#8b5cf6" opacity="0.8"/>
+  <rect x="4" y="2" width="24" height="32" rx="2" fill="url(#editorGradient)"/>
+  <!-- Document lines -->
+  <rect x="8" y="8" width="16" height="2" rx="1" fill="white"/>
+  <rect x="8" y="13" width="12" height="2" rx="1" fill="white"/>
+  <rect x="8" y="18" width="14" height="2" rx="1" fill="white"/>
+  <rect x="8" y="23" width="10" height="2" rx="1" fill="white"/>
+  <rect x="8" y="28" width="13" height="2" rx="1" fill="white"/>
+  <!-- Text: TeamSync Editor -->
+  <text x="42" y="30" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="600" fill="#1e293b">
+    <tspan fill="url(#editorGradient)">TeamSync</tspan>
+    <tspan fill="#64748b"> Editor</tspan>
+  </text>
+</svg>

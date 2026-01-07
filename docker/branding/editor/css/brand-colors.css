@@ -1,0 +1,80 @@
+/* =============================================================================
+ * TeamSync Editor - Brand Colors
+ * Full-featured editor variant - Purple/Violet theme
+ * ============================================================================= */
+
+:root {
+    /* Primary brand colors - Editor Purple/Violet */
+    --teamsync-primary: #7c3aed;
+    --teamsync-primary-dark: #6d28d9;
+    --teamsync-primary-light: #8b5cf6;
+    --teamsync-primary-lighter: #a78bfa;
+    --teamsync-primary-lightest: #c4b5fd;
+
+    /* Secondary colors */
+    --teamsync-secondary: #ec4899;
+    --teamsync-accent: #06b6d4;
+
+    /* Neutral colors */
+    --teamsync-gray-50: #f8fafc;
+    --teamsync-gray-100: #f1f5f9;
+    --teamsync-gray-200: #e2e8f0;
+    --teamsync-gray-300: #cbd5e1;
+    --teamsync-gray-400: #94a3b8;
+    --teamsync-gray-500: #64748b;
+    --teamsync-gray-600: #475569;
+    --teamsync-gray-700: #334155;
+    --teamsync-gray-800: #1e293b;
+    --teamsync-gray-900: #0f172a;
+
+    /* Override Collabora/COOL variables */
+    --co-primary-element: var(--teamsync-primary);
+    --co-primary-element-light: var(--teamsync-primary-light);
+    --co-primary-element-dark: var(--teamsync-primary-dark);
+
+    /* VEX theming (used in COOL) */
+    --vex-brand-color: var(--teamsync-primary);
+    --vex-brand-color-light: var(--teamsync-primary-light);
+    --vex-brand-text-color: #ffffff;
+}
+
+/* Header/toolbar branding */
+.logo-container,
+.brand-logo,
+#main-menu .logo {
+    background-color: var(--teamsync-primary) !important;
+}
+
+/* Button primary styling */
+.btn-primary,
+.vex-dialog-button-primary,
+button.primary {
+    background-color: var(--teamsync-primary) !important;
+    border-color: var(--teamsync-primary) !important;
+}
+
+.btn-primary:hover,
+.vex-dialog-button-primary:hover,
+button.primary:hover {
+    background-color: var(--teamsync-primary-dark) !important;
+    border-color: var(--teamsync-primary-dark) !important;
+}
+
+/* Focus states */
+*:focus {
+    outline-color: var(--teamsync-primary-light) !important;
+}
+
+/* Selection highlight */
+::selection {
+    background-color: var(--teamsync-primary-lightest);
+}
+
+/* Links */
+a {
+    color: var(--teamsync-primary);
+}
+
+a:hover {
+    color: var(--teamsync-primary-dark);
+}

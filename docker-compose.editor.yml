@@ -1,0 +1,168 @@
+# =============================================================================
+# TeamSync Editor - Standalone Docker Compose
+# =============================================================================
+#
+# Full-featured collaborative document editor supporting ALL document types:
+# - Documents: .docx, .doc, .odt, .rtf, .txt
+# - Spreadsheets: .xlsx, .xls, .ods, .csv
+# - Presentations: .pptx, .ppt, .odp
+# - Drawings: .odg, .vsdx
+#
+# Production-optimized for 100,000+ users with:
+# - All "Development Edition" nag screens removed
+# - No artificial document/connection limits
+# - Purple/Violet TeamSync branding
+#
+# Usage:
+#   # Build and run
+#   docker-compose -f docker-compose.editor.yml up -d
+#
+#   # Or build from source (takes 3-5 hours, but no limits)
+#   docker-compose -f docker-compose.editor.yml --profile source up -d
+#
+# Environment Variables:
+#   PORT              - Listen port (default: 9980)
+#   LOG_LEVEL         - Logging level (default: warning)
+#   WOPI_HOST         - WOPI host URL for document access
+#   COOL_ADMIN_USER   - Admin console username
+#   COOL_ADMIN_PASSWORD - Admin console password
+#
+# Ports:
+#   - 9980: TeamSync Editor
+#   - 9191: Prometheus metrics (optional)
+#
+# =============================================================================
+
+services:
+  # ===========================================================================
+  # TeamSync Editor - Full-Featured Editor (Package-Based Build)
+  # Fast build (~5 minutes), uses official Collabora packages
+  # ===========================================================================
+  teamsync-editor:
+    image: ghcr.io/${GITHUB_REPOSITORY_OWNER:-angelbot-ai}/teamsync-editor:latest
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.editor
+    container_name: teamsync-editor
+    ports:
+      - "${PORT:-9980}:9980"
+      - "9191:9191"  # Prometheus metrics
+    environment:
+      - TEAMSYNC_PRODUCT=editor
+      - SSL_ENABLE=false
+      - SSL_TERMINATION=true
+      - LOG_LEVEL=${LOG_LEVEL:-warning}
+      - COOL_ADMIN_USER=${COOL_ADMIN_USER:-}
+      - COOL_ADMIN_PASSWORD=${COOL_ADMIN_PASSWORD:-}
+      # WOPI host configuration (set this to your application URL)
+      - aliasgroup1=${WOPI_HOST:-}
+      # Performance tuning
+      - MEMPROPORTION=80.0
+      - MAX_CONNECTIONS=100000
+      - MAX_DOCUMENTS=100000
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    cap_add:
+      - MKNOD
+      - SYS_CHROOT
+      - FOWNER
+      - CHOWN
+      - SYS_ADMIN
+    security_opt:
+      - seccomp:unconfined
+      - apparmor:unconfined
+    # Production resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '2'
+          memory: 4G
+    # File descriptor limits for high concurrency
+    ulimits:
+      nofile:
+        soft: 100000
+        hard: 100000
+      nproc:
+        soft: 65535
+        hard: 65535
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "--max-time", "30", "http://localhost:9980/hosting/discovery"]
+      interval: 60s
+      timeout: 60s
+      start_period: 300s
+      retries: 10
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # ===========================================================================
+  # TeamSync Editor - Enterprise Source Build (Optional)
+  # Use with: docker-compose --profile source up -d
+  # Takes 3-5 hours to build, but has NO limits compiled into the binary
+  # ===========================================================================
+  teamsync-editor-source:
+    profiles:
+      - source
+    image: ghcr.io/${GITHUB_REPOSITORY_OWNER:-angelbot-ai}/teamsync-editor-source:latest
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.editor-source
+    container_name: teamsync-editor-source
+    ports:
+      - "${PORT:-9980}:9980"
+      - "9191:9191"  # Prometheus metrics
+    environment:
+      - TEAMSYNC_PRODUCT=editor
+      - SSL_ENABLE=false
+      - SSL_TERMINATION=true
+      - LOG_LEVEL=${LOG_LEVEL:-warning}
+      - COOL_ADMIN_USER=${COOL_ADMIN_USER:-}
+      - COOL_ADMIN_PASSWORD=${COOL_ADMIN_PASSWORD:-}
+      - aliasgroup1=${WOPI_HOST:-}
+      - MEMPROPORTION=80.0
+      - MAX_CONNECTIONS=100000
+      - MAX_DOCUMENTS=100000
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    cap_add:
+      - MKNOD
+      - SYS_CHROOT
+      - FOWNER
+      - CHOWN
+      - SYS_ADMIN
+    security_opt:
+      - seccomp:unconfined
+      - apparmor:unconfined
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '2'
+          memory: 4G
+    ulimits:
+      nofile:
+        soft: 100000
+        hard: 100000
+      nproc:
+        soft: 65535
+        hard: 65535
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "--max-time", "30", "http://localhost:9980/hosting/discovery"]
+      interval: 60s
+      timeout: 60s
+      start_period: 300s
+      retries: 10
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"

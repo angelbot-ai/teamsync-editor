@@ -23,6 +23,8 @@ on:
           - document-source
           - sheets
           - presentation
+          - editor
+          - editor-source
 
 env:
   REGISTRY: ghcr.io
@@ -42,10 +44,10 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             if [ "${{ inputs.image }}" == "all" ]; then
-              echo 'package-matrix={"include":[{"product":"document","dockerfile":"Dockerfile.document"},{"product":"sheets","dockerfile":"Dockerfile.sheets"},{"product":"presentation","dockerfile":"Dockerfile.presentation"}]}' >> $GITHUB_OUTPUT
+              echo 'package-matrix={"include":[{"product":"document","dockerfile":"Dockerfile.document"},{"product":"sheets","dockerfile":"Dockerfile.sheets"},{"product":"presentation","dockerfile":"Dockerfile.presentation"},{"product":"editor","dockerfile":"Dockerfile.editor"}]}' >> $GITHUB_OUTPUT
               echo "build-packages=true" >> $GITHUB_OUTPUT
               echo "build-source=true" >> $GITHUB_OUTPUT
-            elif [ "${{ inputs.image }}" == "document-source" ]; then
+            elif [ "${{ inputs.image }}" == "document-source" ] || [ "${{ inputs.image }}" == "editor-source" ]; then
               echo 'package-matrix={"include":[]}' >> $GITHUB_OUTPUT
               echo "build-packages=false" >> $GITHUB_OUTPUT
               echo "build-source=true" >> $GITHUB_OUTPUT
@@ -58,7 +60,7 @@ jobs:
             fi
           else
             # On push, build all images
-            echo 'package-matrix={"include":[{"product":"document","dockerfile":"Dockerfile.document"},{"product":"sheets","dockerfile":"Dockerfile.sheets"},{"product":"presentation","dockerfile":"Dockerfile.presentation"}]}' >> $GITHUB_OUTPUT
+            echo 'package-matrix={"include":[{"product":"document","dockerfile":"Dockerfile.document"},{"product":"sheets","dockerfile":"Dockerfile.sheets"},{"product":"presentation","dockerfile":"Dockerfile.presentation"},{"product":"editor","dockerfile":"Dockerfile.editor"}]}' >> $GITHUB_OUTPUT
             echo "build-packages=true" >> $GITHUB_OUTPUT
             echo "build-source=true" >> $GITHUB_OUTPUT
           fi
@@ -255,11 +257,11 @@ jobs:
           echo "|-------|------|------------|" >> $GITHUB_STEP_SUMMARY
 
           # Pull and report sizes for all images
-          for IMAGE in document document-source sheets presentation; do
+          for IMAGE in document document-source sheets presentation editor editor-source; do
             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/teamsync-${IMAGE}:latest 2>/dev/null || continue
             SIZE=$(docker images ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/teamsync-${IMAGE}:latest --format "{{.Size}}")
-            if [ "$IMAGE" == "document-source" ]; then
-              BUILD_TYPE="Full Source Build"
+            if [ "$IMAGE" == "document-source" ] || [ "$IMAGE" == "editor-source" ]; then
+              BUILD_TYPE="Full Source Build (Enterprise)"
             else
               BUILD_TYPE="Pre-built Packages"
             fi

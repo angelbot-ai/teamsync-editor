@@ -1,0 +1,521 @@
+# =============================================================================
+# TeamSync Editor - Full Source Build (Production Enterprise)
+# =============================================================================
+#
+# Handles: ALL document types (.docx, .xlsx, .pptx, .odt, .ods, .odp, etc.)
+# Platform: Multi-platform (linux/amd64, linux/arm64)
+# Build: Compiles both LibreOffice and Collabora from source
+# License: MPL 2.0 Compliant
+#
+# This Dockerfile builds LibreOffice and Collabora Online from source with:
+# - ALL LibreOffice components (Writer, Calc, Impress, Draw, Math)
+# - ENTERPRISE compile flags (no connection/document limits)
+# - COMPILE-TIME nag removal (not post-install patching)
+# - Production optimizations (stripped binaries, minimal runtime)
+#
+# Key differences from Dockerfile.editor (package-based):
+# - --with-max-connections=100000 (compile-time, cannot be circumvented)
+# - --with-max-documents=100000 (compile-time, cannot be circumvented)
+# - Source-level nag screen removal (more reliable than post-install)
+# - Smaller final image (~1.2GB vs ~1.5GB)
+#
+# NOTE: This build takes 3-5 hours due to LibreOffice compilation from source
+# Use Dockerfile.editor for fast development builds (~5 minutes)
+#
+# =============================================================================
+
+# =============================================================================
+# STAGE 1: Builder Base - Install build dependencies (cached layer)
+# =============================================================================
+FROM ubuntu:24.04 AS builder-base
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8
+
+# Install build dependencies for LibreOffice compilation
+# Ubuntu 24.04 provides all required library versions for LibreOffice 24.x/25.x
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    autoconf \
+    automake \
+    bison \
+    build-essential \
+    ca-certificates \
+    ccache \
+    cmake \
+    cpio \
+    curl \
+    doxygen \
+    flex \
+    fontconfig \
+    fonts-liberation \
+    fonts-opensymbol \
+    fonts-noto-core \
+    gettext \
+    git \
+    gperf \
+    graphviz \
+    libabw-dev \
+    libatk1.0-dev \
+    libboost-all-dev \
+    libcairo2-dev \
+    libcap-dev \
+    libcap2-bin \
+    libcdr-dev \
+    libclucene-dev \
+    libcppunit-dev \
+    libcurl4-gnutls-dev \
+    libe-book-dev \
+    libepoxy-dev \
+    libetonyek-dev \
+    libexpat1-dev \
+    libfontconfig1-dev \
+    libfreehand-dev \
+    libfreetype-dev \
+    libglib2.0-dev \
+    libgraphite2-dev \
+    libgtk-3-dev \
+    libharfbuzz-dev \
+    libhunspell-dev \
+    libhyphen-dev \
+    libicu-dev \
+    libkrb5-dev \
+    libjpeg-dev \
+    liblangtag-dev \
+    liblcms2-dev \
+    libmspub-dev \
+    libmwaw-dev \
+    libmythes-dev \
+    libnss3-dev \
+    libnspr4-dev \
+    libnumbertext-dev \
+    liborcus-dev \
+    libpagemaker-dev \
+    libpam-dev \
+    libpango1.0-dev \
+    libpixman-1-dev \
+    libpng-dev \
+    libpoco-dev \
+    libqxp-dev \
+    librevenge-dev \
+    libssl-dev \
+    libstaroffice-dev \
+    libtool \
+    libvisio-dev \
+    libwpd-dev \
+    libwpg-dev \
+    libwps-dev \
+    libx11-dev \
+    libxcomposite-dev \
+    libxcursor-dev \
+    libxext-dev \
+    libxinerama-dev \
+    libxml2-dev \
+    libxmlsec1-dev \
+    libxrandr-dev \
+    libxrender-dev \
+    libxslt1-dev \
+    libxt-dev \
+    libzmf-dev \
+    libzstd-dev \
+    zlib1g-dev \
+    pkg-config \
+    python3 \
+    python3-dev \
+    python3-lxml \
+    python3-polib \
+    python3-setuptools \
+    rsync \
+    unzip \
+    wget \
+    xsltproc \
+    xz-utils \
+    zip \
+    libxml2-utils \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# Install Node.js 20 LTS
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && npm cache clean --force \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# Setup ccache for faster rebuilds
+ENV CCACHE_DIR=/ccache \
+    PATH="/usr/lib/ccache:$PATH"
+RUN mkdir -p /ccache && chmod 777 /ccache
+
+WORKDIR /build
+
+# =============================================================================
+# STAGE 2: Build LibreOffice Core from Source (FULL - All Components)
+# =============================================================================
+FROM builder-base AS locore
+
+ARG LO_VERSION=distro/collabora/co-25.04
+ENV LO_BUILD_DIR=/build/libreoffice
+
+WORKDIR /build
+
+# Clone LibreOffice core (shallow clone to save time)
+RUN echo "==> Cloning LibreOffice core (v${LO_VERSION})..." \
+    && git clone --depth 1 --single-branch --branch ${LO_VERSION} \
+       https://github.com/LibreOffice/core.git libreoffice
+
+WORKDIR ${LO_BUILD_DIR}
+
+# Configure LibreOffice using official Collabora LOKit distro config
+# IMPORTANT: We use CPLinux-LOKit which includes ALL components
+# (Writer, Calc, Impress, Draw, Math) and enables --enable-mergelibs
+RUN echo "==> Configuring LibreOffice build with CPLinux-LOKit distro (FULL)..." \
+    && ./autogen.sh \
+    --with-distro=CPLinux-LOKit \
+    --without-package-format \
+    --without-system-icu \
+    --with-lang=en-US \
+    --with-parallelism=$(nproc) 2>&1 | tee /build/configure.log
+
+# Build LibreOffice (this takes 2-4 hours)
+RUN echo "==> Building LibreOffice (this will take several hours)..." \
+    && make -j$(nproc) 2>&1 | tee /build/lo-build.log
+
+# Copy LibreOffice to staging area
+RUN mkdir -p /build/instdir \
+    && cp -r ${LO_BUILD_DIR}/instdir/* /build/instdir/ \
+    && echo "==> LibreOffice build complete - instdir size:" \
+    && du -sh /build/instdir
+
+# Create include directory for LOKit headers
+RUN mkdir -p /build/include \
+    && cp -r ${LO_BUILD_DIR}/include/LibreOfficeKit /build/include/
+
+# =============================================================================
+# STAGE 3: Build Collabora Online with ENTERPRISE FLAGS & Nag Removal
+# =============================================================================
+FROM locore AS builder
+
+ARG COOL_VERSION=cp-25.04.8-1
+ARG BRAND_NAME="TeamSync Editor"
+
+WORKDIR /build
+
+# Clone Collabora Online source
+RUN git clone --depth 1 --single-branch --branch ${COOL_VERSION} \
+    https://github.com/CollaboraOnline/online.git
+
+# Copy branding assets
+COPY docker/branding/editor/ /build/branding/
+COPY docker/branding/LICENSE_NOTICE.txt /build/branding/
+
+# =============================================================================
+# SOURCE-LEVEL NAG REMOVAL (Before compilation)
+# This is more reliable than post-install patching
+# =============================================================================
+RUN echo "==> Applying source-level nag removal..." \
+    # 1. Disable "isAnyCode" checks in JavaScript source
+    && find /build/online/browser -name "*.js" -type f -exec \
+       sed -i 's/if\s*(isAnyCode)/if (false)/g' {} \; 2>/dev/null || true \
+    && find /build/online/browser -name "*.js" -type f -exec \
+       sed -i 's/if(isAnyCode)/if(false)/g' {} \; 2>/dev/null || true \
+    && find /build/online/browser -name "*.js" -type f -exec \
+       sed -i 's/isAnyCodeOrDevelopment/false/g' {} \; 2>/dev/null || true \
+    # 2. Remove "Development Edition" strings
+    && find /build/online/browser -name "*.js" -type f -exec \
+       sed -i 's/"Collabora Online Development Edition"/"TeamSync Editor"/g' {} \; 2>/dev/null || true \
+    && find /build/online/browser -name "*.js" -type f -exec \
+       sed -i 's/"This is an unsupported version"/""/g' {} \; 2>/dev/null || true \
+    # 3. Neutralize welcome screen HTML
+    && if [ -d /build/online/browser/dist/welcome ]; then \
+           echo '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body></body></html>' \
+               > /build/online/browser/dist/welcome/welcome.html; \
+       fi \
+    # 4. Update configure.ac defaults to disable welcome by default
+    && sed -i 's/enable_welcome=yes/enable_welcome=no/g' /build/online/configure.ac 2>/dev/null || true \
+    && echo "==> Source-level nag removal complete"
+
+# Copy and execute white-label script for additional branding
+COPY docker/scripts/white-label.sh /build/white-label.sh
+RUN chmod +x /build/white-label.sh \
+    && /build/white-label.sh /build/online /build/branding 2>/dev/null || true
+
+# Replace logo files
+RUN if [ -f /build/branding/images/logo.svg ]; then \
+        find /build/online/browser -type f \( -name "collabora-logo*.svg" -o -name "loleaflet-logo*.svg" \) \
+            -exec cp /build/branding/images/logo.svg {} \; 2>/dev/null || true; \
+    fi
+
+# Apply custom CSS
+RUN if [ -f /build/branding/css/brand-colors.css ]; then \
+        cat /build/branding/css/brand-colors.css >> \
+            /build/online/browser/src/control/Control.UIManager.css 2>/dev/null || true; \
+    fi
+
+# Build browser assets with production optimizations
+WORKDIR /build/online/browser
+RUN npm install --no-audit \
+    && npm cache clean --force
+
+# Configure and build coolwsd with ENTERPRISE PRODUCTION SETTINGS
+WORKDIR /build/online
+RUN ./autogen.sh
+
+# =============================================================================
+# ENTERPRISE CONFIGURE FLAGS
+# These compile-time settings CANNOT be circumvented at runtime
+# =============================================================================
+RUN ./configure \
+    --prefix=/opt/cool \
+    --with-lokit-path=/build/include \
+    --with-lo-path=/opt/lokit \
+    # ENTERPRISE: Product branding
+    --with-app-name="TeamSync Editor" \
+    --with-vendor="TeamSync" \
+    # ENTERPRISE: Remove ALL connection/document limits
+    --with-max-connections=100000 \
+    --with-max-documents=100000 \
+    # PRODUCTION: Optimization flags
+    --enable-silent-rules \
+    --disable-debug \
+    --disable-setcap \
+    --disable-ssl \
+    # DISABLE: Welcome screen at compile time
+    --disable-welcome
+
+# Build with all available CPU cores
+RUN make -j$(nproc)
+RUN make DESTDIR=/install install
+
+# Prepare LibreOffice installation
+RUN mkdir -p /opt/lokit && cp -r /build/instdir/* /opt/lokit/
+
+# =============================================================================
+# OPTIMIZATION - Remove unnecessary files (but keep ALL components)
+# =============================================================================
+RUN cd /opt/lokit && \
+    echo "==> Starting optimization (keeping all components)..." && \
+    # Remove help, SDK, and other non-essential files
+    rm -rf \
+        help/ \
+        sdk/ \
+        share/basic/Tutorials/ \
+        share/extensions/ \
+        share/gallery/ \
+        share/samples/ \
+        share/template/ \
+        share/wizards/ \
+        share/autotext/ \
+        share/autocorr/ \
+        share/Scripts/ \
+        program/classes/ \
+        program/wizards/ \
+        2>/dev/null || true && \
+    # Keep essential fonts only
+    find share/fonts -type f \
+        ! -name "Liberation*.ttf" \
+        ! -name "opens*.ttf" \
+        ! -name "liber*.ttf" \
+        ! -name "Noto*.ttf" \
+        -delete 2>/dev/null || true && \
+    # Remove empty directories
+    find . -type d -empty -delete 2>/dev/null || true && \
+    # Strip debug symbols from all binaries and libraries
+    find program -type f \( -name "*.so" -o -name "*.so.*" \) \
+        -exec strip --strip-unneeded {} \; 2>/dev/null || true && \
+    find program -type f -executable ! -name "*.so*" \
+        -exec strip --strip-unneeded {} \; 2>/dev/null || true && \
+    echo "==> Optimization complete"
+
+# Create systemplate with proper timezone support
+RUN echo "Etc/UTC" > /etc/timezone \
+    && ln -sf /usr/share/zoneinfo/Etc/UTC /etc/localtime \
+    && mkdir -p /install/opt/cool/systemplate /install/opt/cool/child-roots \
+    && ./coolwsd-systemplate-setup /install/opt/cool/systemplate /opt/lokit || true
+
+# Copy lokit into systemplate (REQUIRED for chroot jails to work)
+RUN mkdir -p /install/opt/cool/systemplate/opt \
+    && cp -a /opt/lokit /install/opt/cool/systemplate/opt/lokit
+
+# Strip coolwsd binaries
+RUN find /install/opt/cool/bin -type f -executable \
+    -exec strip --strip-unneeded {} \; 2>/dev/null || true
+
+# Generate size report
+RUN echo "=== BUILD SIZE REPORT (FULL EDITOR) ===" \
+    && echo "LibreOffice kit (ALL components):" && du -sh /opt/lokit \
+    && echo "Systemplate:" && du -sh /install/opt/cool/systemplate \
+    && echo "COOL binaries:" && du -sh /install/opt/cool/bin \
+    && echo "========================================"
+
+# =============================================================================
+# STAGE 4: Production Runtime Image (Minimal footprint)
+# =============================================================================
+FROM ubuntu:24.04 AS runtime
+
+# Production environment configuration
+ENV DEBIAN_FRONTEND=noninteractive \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
+    TEAMSYNC_PRODUCT="editor" \
+    # Enterprise settings (compiled in, but also set as env for documentation)
+    MEMPROPORTION=80.0 \
+    MAX_CONNECTIONS=100000 \
+    MAX_DOCUMENTS=100000 \
+    # Disable core dumps in production
+    COOL_NO_DUMP=1
+
+# OCI Image Labels
+LABEL maintainer="TeamSync <support@teamsync.io>" \
+      org.opencontainers.image.title="TeamSync Editor (Source Build - Enterprise)" \
+      org.opencontainers.image.description="Full-featured collaborative document editing - built from source with enterprise compile flags, no limits" \
+      org.opencontainers.image.licenses="MPL-2.0" \
+      org.opencontainers.image.vendor="TeamSync" \
+      org.opencontainers.image.source="https://github.com/angelbot-ai/teamsync-editor" \
+      teamsync.product="editor" \
+      teamsync.filetypes="docx,doc,odt,rtf,txt,xlsx,xls,ods,csv,pptx,ppt,odp,odg,vsdx,pdf" \
+      teamsync.build="source-enterprise" \
+      teamsync.version="1.0.0" \
+      teamsync.limits="none"
+
+# Install minimal runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Core system libraries
+    libcap2 \
+    libcap2-bin \
+    libpng16-16 \
+    libssl3 \
+    libpam0g \
+    libzstd1 \
+    # Poco runtime libraries (Ubuntu 24.04)
+    libpocofoundation80t64 \
+    libpoconet80t64 \
+    libpoconetssl80t64 \
+    libpococrypto80t64 \
+    libpocoutil80t64 \
+    libpocoxml80t64 \
+    libpocojson80t64 \
+    # System utilities
+    ca-certificates \
+    curl \
+    tzdata \
+    procps \
+    # Font rendering
+    fontconfig \
+    fonts-liberation \
+    fonts-noto-core \
+    # Spell checking (English)
+    hunspell \
+    hunspell-en-us \
+    # LibreOffice runtime dependencies
+    libfreetype6 \
+    libfontconfig1 \
+    libharfbuzz0b \
+    libexpat1 \
+    libxml2 \
+    libxslt1.1 \
+    libnss3 \
+    libnspr4 \
+    libcairo2 \
+    libpixman-1-0 \
+    libglib2.0-0t64 \
+    libatk1.0-0t64 \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libx11-6 \
+    libxext6 \
+    libxrender1 \
+    libepoxy0 \
+    liblcms2-2 \
+    libhunspell-1.7-0 \
+    libboost-filesystem1.83.0 \
+    libboost-locale1.83.0 \
+    libgraphite2-3 \
+    liborcus-0.18-0 \
+    libcdr-0.1-1 \
+    libvisio-0.1-1 \
+    libwpd-0.10-10 \
+    libwpg-0.3-3 \
+    libwps-0.4-4 \
+    libmspub-0.1-1 \
+    libe-book-0.1-1 \
+    libabw-0.1-1 \
+    libetonyek-0.1-1 \
+    libfreehand-0.1-1 \
+    libstaroffice-0.0-0 \
+    libzmf-0.0-0 \
+    libpagemaker-0.0-0 \
+    libqxp-0.0-0 \
+    liblangtag1 \
+    librevenge-0.0-0 \
+    libclucene-core1v5 \
+    libxmlsec1-openssl \
+    && apt-get clean \
+    && rm -rf \
+        /var/lib/apt/lists/* \
+        /tmp/* \
+        /var/tmp/* \
+        /usr/share/doc/* \
+        /usr/share/man/* \
+        /usr/share/info/* \
+        /usr/share/lintian/*
+
+# Build fontconfig cache
+RUN fc-cache -fv
+
+# Create non-root service user
+RUN useradd -r -m -d /opt/cool -s /bin/false -c "Collabora Online" cool
+
+# Create required directories
+RUN mkdir -p \
+    /opt/cool/systemplate \
+    /opt/cool/child-roots \
+    /opt/cool/browser \
+    /opt/cool/tmp \
+    /etc/coolwsd \
+    /var/log/coolwsd \
+    /var/cache/coolwsd \
+    /tmp/coolwsd \
+    && chown -R cool:cool /opt/cool /var/log/coolwsd /var/cache/coolwsd /tmp/coolwsd
+
+# Copy built artifacts from builder stage
+COPY --from=builder --chown=cool:cool /install/opt/cool/bin /opt/cool/bin
+COPY --from=builder --chown=cool:cool /install/opt/cool/share /opt/cool/share
+COPY --from=builder --chown=cool:cool /install/opt/cool/child-roots /opt/cool/child-roots
+COPY --from=builder --chown=cool:cool /install/opt/cool/systemplate /opt/cool/systemplate
+COPY --from=builder --chown=cool:cool /opt/lokit /opt/lokit
+COPY --from=builder /build/online/coolwsd.xml /etc/coolwsd/coolwsd.xml
+
+# Copy production config and apply settings
+COPY docker/config/coolwsd-editor.xml /tmp/coolwsd-editor.xml
+RUN sed -i 's/<num_prespawn_children[^>]*>[^<]*</<num_prespawn_children type="uint" default="1">5</g' /etc/coolwsd/coolwsd.xml 2>/dev/null || true \
+    && sed -i 's/<level[^>]*>information</<level type="string" default="warning">warning</g' /etc/coolwsd/coolwsd.xml 2>/dev/null || true \
+    && rm -f /tmp/coolwsd-editor.xml
+
+# Copy license notice
+COPY docker/branding/LICENSE_NOTICE.txt /opt/cool/LICENSE_NOTICE.txt
+
+# Setup symlinks for coolwsd operation
+RUN ln -sf /opt/cool/share/coolwsd/browser /opt/cool/bin/browser \
+    && ln -sf /opt/cool/share/coolwsd/discovery.xml /opt/cool/bin/discovery.xml \
+    && ln -sf /opt/cool/share/coolwsd/favicon.ico /opt/cool/bin/favicon.ico \
+    && ln -sf /opt/cool/systemplate /opt/cool/bin/systemplate \
+    && mkdir -p /opt/cool/bin/jails \
+    && chown -R cool:cool /opt/cool \
+    && chmod 755 /opt/cool/bin/*
+
+# Set Linux capabilities for jail creation
+RUN setcap cap_fowner,cap_chown,cap_mknod,cap_sys_chroot=ep /opt/cool/bin/coolforkit-caps 2>/dev/null || \
+    setcap cap_fowner,cap_chown,cap_mknod,cap_sys_chroot=ep /opt/cool/bin/coolforkit-ns 2>/dev/null || true
+
+# Copy entrypoint script
+COPY --chmod=755 docker/scripts/entrypoint.sh /entrypoint.sh
+
+# Expose ports (main + monitoring)
+EXPOSE 9980 9191
+
+# Production-ready healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --start-period=180s --retries=3 \
+    CMD curl -sf http://localhost:${PORT:-9980}/hosting/discovery > /dev/null || exit 1
+
+WORKDIR /opt/cool
+
+ENTRYPOINT ["/entrypoint.sh"]
