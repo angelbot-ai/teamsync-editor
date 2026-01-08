@@ -87,14 +87,15 @@ add_wopi_host() {
 # =============================================================================
 # Configure WOPI Host - Set alias_groups mode and add hosts
 # =============================================================================
-echo "[1/6] Configuring WOPI hosts..."
+echo "[1/8] Configuring WOPI hosts..."
 
 # Change alias_groups mode from 'first' to 'groups' to allow multiple hosts
 sed -i 's|mode="first"|mode="groups"|g' "$CONFIG_FILE"
 
-# Add a group with all common development and production hosts
-# This allows localhost, 127.0.0.1, host.docker.internal, and Railway/Render domains
-sed -i 's|</alias_groups>|<group>\
+# Only add WOPI host group if not already configured (prevents duplicate groups on restart)
+if ! grep -q 'desc="teamsync-hosts"' "$CONFIG_FILE" 2>/dev/null; then
+    # Add a group with all common development and production hosts
+    sed -i 's|</alias_groups>|<group desc="teamsync-hosts">\
                 <host desc="localhost" allow="true">localhost</host>\
                 <host desc="127.0.0.1" allow="true">127\\.0\\.0\\.1</host>\
                 <host desc="host.docker.internal" allow="true">host\\.docker\\.internal</host>\
@@ -104,8 +105,10 @@ sed -i 's|</alias_groups>|<group>\
                 <host desc="render" allow="true">.*\\.onrender\\.com</host>\
             </group>\
             </alias_groups>|g' "$CONFIG_FILE"
-
-echo "  Enabled WOPI hosts: localhost, 127.0.0.1, host.docker.internal, *.railway.app, *.onrender.com"
+    echo "  Added WOPI host group: localhost, 127.0.0.1, host.docker.internal, *.railway.app, *.onrender.com"
+else
+    echo "  WOPI hosts already configured (skipping)"
+fi
 
 # Add custom WOPI host if specified
 if [ -n "$WOPI_HOST_URL" ]; then

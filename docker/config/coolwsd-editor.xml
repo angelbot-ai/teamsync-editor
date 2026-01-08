@@ -174,7 +174,20 @@
 
         <!-- Content Security Policy -->
         <content_security_policy desc="CSP header" type="string" default="">default-src 'self' 'unsafe-inline' 'unsafe-eval'; img-src * data:; connect-src *; frame-ancestors *;</content_security_policy>
+
+        <!-- Disable seccomp (not available in containers without SYS_ADMIN) -->
+        <seccomp desc="Enable seccomp sandboxing" type="bool" default="false">false</seccomp>
     </security>
+
+    <!-- =========================================================================
+         Container Environment Settings (CRITICAL for Railway/Docker)
+         ========================================================================= -->
+
+    <!-- Disable mount namespaces - requires SYS_ADMIN capability which most containers don't have -->
+    <mount_namespaces desc="Use mount namespaces for jail" type="bool" default="false">false</mount_namespaces>
+
+    <!-- Disable bind-mount based jail - requires SYS_ADMIN for bind mounts -->
+    <mount_jail_tree desc="Use bind mounts for jail" type="bool" default="false">false</mount_jail_tree>
 
     <!-- =========================================================================
          Fonts
