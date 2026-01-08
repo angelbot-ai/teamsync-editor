@@ -20,17 +20,21 @@
 
 set -e
 
+# Version information
+TEAMSYNC_VERSION="${TEAMSYNC_VERSION:-1.0.0}"
+BUILD_VERSION="25.04"
+
 # Determine product name based on variant
 TEAMSYNC_PRODUCT="${TEAMSYNC_PRODUCT:-all}"
 case "$TEAMSYNC_PRODUCT" in
     document)
-        PRODUCT_NAME="TeamSync Document"
+        PRODUCT_NAME="TeamSync Document Editor"
         ;;
     sheets)
-        PRODUCT_NAME="TeamSync Sheets"
+        PRODUCT_NAME="TeamSync Sheets Editor"
         ;;
     presentation)
-        PRODUCT_NAME="TeamSync Presentation"
+        PRODUCT_NAME="TeamSync Presentation Editor"
         ;;
     *)
         PRODUCT_NAME="TeamSync Editor"
@@ -38,7 +42,7 @@ case "$TEAMSYNC_PRODUCT" in
 esac
 
 echo "==========================================="
-echo "$PRODUCT_NAME (25.04) - Starting..."
+echo "$PRODUCT_NAME v${TEAMSYNC_VERSION} (${BUILD_VERSION})"
 echo "==========================================="
 
 # =============================================================================

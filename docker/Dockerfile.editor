@@ -142,8 +142,9 @@ COPY docker/branding/LICENSE_NOTICE.txt /tmp/branding/
 COPY docker/scripts/apply-branding.sh /tmp/apply-branding.sh
 
 # Apply branding modifications to the installed Collabora assets
+# Product name: TeamSync Editor v1.0.0
 RUN chmod +x /tmp/apply-branding.sh \
-    && /tmp/apply-branding.sh /usr/share/coolwsd /tmp/branding "TeamSync Editor" \
+    && /tmp/apply-branding.sh /usr/share/coolwsd /tmp/branding "TeamSync Editor v1.0.0" \
     && rm -rf /tmp/branding /tmp/apply-branding.sh
 
 # Copy license notice to final location

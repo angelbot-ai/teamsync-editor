@@ -76,11 +76,12 @@ RUN git clone --depth 1 --single-branch --branch ${COOL_VERSION} \
     https://github.com/CollaboraOnline/online.git
 
 # Copy branding assets and apply white-label
+# Product name: TeamSync Document Editor v1.0.0
 COPY docker/branding/document/ /build/branding/
 COPY docker/branding/LICENSE_NOTICE.txt /build/branding/
 COPY docker/scripts/white-label.sh /build/white-label.sh
 RUN chmod +x /build/white-label.sh \
-    && /build/white-label.sh /build/online /build/branding
+    && /build/white-label.sh /build/online /build/branding "TeamSync Document Editor" "1.0.0"
 
 # Replace logo files if provided
 RUN if [ -f /build/branding/images/logo.svg ]; then \

@@ -18,12 +18,14 @@
 set -e
 
 # Configuration
-BRAND_NAME="TeamSync Editor"
+# Product name can be passed as 3rd argument, defaults to "TeamSync Editor"
+BRAND_NAME="${3:-TeamSync Editor}"
 BRAND_SHORT="TeamSync"
 ORIGINAL_BRAND="Collabora Online"
 ORIGINAL_SHORT="CODE"
 ONLINE_DIR="${1:-/build/online}"
 BRANDING_DIR="${2:-/build/branding}"
+TEAMSYNC_VERSION="${4:-1.0.0}"
 
 echo "=========================================="
 echo "TeamSync Editor White-Label Script"
