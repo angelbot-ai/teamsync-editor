@@ -105,11 +105,8 @@ find ./browser -type f -name "*.css" 2>/dev/null | while read -r file; do
     sed -i 's/collabora-logo\.png/teamsync-logo.png/g' "$file"
     sed -i 's/collabora_logo/teamsync_logo/g' "$file"
 
-    # Replace brand colors (Collabora green to TeamSync blue)
-    # Original Collabora green: #00897B, #1b8c62
-    # TeamSync blue: #2563eb, #1d4ed8
-    sed -i 's/#00897B/#2563eb/gi' "$file"
-    sed -i 's/#1b8c62/#1d4ed8/gi' "$file"
+    # NOTE: Keep default Collabora colors - do not replace brand colors
+    # This preserves the original UI look and feel
 done
 
 # =============================================================================
