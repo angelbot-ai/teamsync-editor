@@ -56,10 +56,10 @@ jobs:
               echo "build-source=false" >> $GITHUB_OUTPUT
             fi
           else
-            # On push, only build editor (unified image with all capabilities)
+            # On push, only build editor package (skip source build - requires manual trigger)
             echo 'package-matrix={"include":[{"product":"editor","dockerfile":"Dockerfile.editor"}]}' >> $GITHUB_OUTPUT
             echo "build-packages=true" >> $GITHUB_OUTPUT
-            echo "build-source=true" >> $GITHUB_OUTPUT
+            echo "build-source=false" >> $GITHUB_OUTPUT
           fi
 
   # Build package-based images (fast, ~3 min each)
@@ -235,7 +235,7 @@ jobs:
 
   # Compare image sizes after all builds complete
   compare-sizes:
-    needs: [build-packages, build-source]
+    needs: [build-packages]
     if: always() && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
