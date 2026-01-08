@@ -482,6 +482,9 @@ COPY --from=builder --chown=cool:cool /install/opt/cool/systemplate /opt/cool/sy
 COPY --from=builder --chown=cool:cool /opt/lokit /opt/lokit
 COPY --from=builder /build/online/coolwsd.xml /etc/coolwsd/coolwsd.xml
 
+# Copy custom production config (overwrites default settings with container-friendly values)
+COPY docker/config/coolwsd-editor.xml /etc/coolwsd/coolwsd-editor.xml
+
 # Copy license notice
 COPY docker/branding/LICENSE_NOTICE.txt /opt/cool/LICENSE_NOTICE.txt
 
