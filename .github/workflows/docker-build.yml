@@ -142,7 +142,8 @@ jobs:
   build-source:
     needs: prepare
     if: needs.prepare.outputs.build-source == 'true'
-    runs-on: Paid_Runner
+    runs-on:
+      labels: Paid_Runner
     timeout-minutes: 480
     permissions:
       contents: read
