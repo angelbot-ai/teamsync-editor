@@ -81,15 +81,19 @@ COPY docker/branding/LICENSE_NOTICE.txt /build/branding/
 WORKDIR /build/online/browser
 RUN npm install --no-audit
 
-# Download official LibreOfficeKit headers for 25.04 from Collabora Online releases
-# These headers are maintained by Collabora and match the 25.04 packages
-ARG LOKIT_HEADERS_URL=https://github.com/CollaboraOnline/online/releases/download/for-code-assets/LibreOfficeKit-includes-co-25.04.tar.gz
-RUN mkdir -p /build/lokit-headers \
-    && curl -fsSL ${LOKIT_HEADERS_URL} | tar -xzf - -C /build/lokit-headers --strip-components=1 \
-    # Add compatibility macros for coolwsd 25.04 branch which expects _LibreOfficeKit struct tag names
-    # These #define macros map old struct tags to new ones (e.g., struct _LibreOfficeKit -> struct LibreOfficeKitStruct)
-    && sed -i '/#define INCLUDED_LIBREOFFICEKIT_LIBREOFFICEKIT_H/a #define _LibreOfficeKit LibreOfficeKitStruct\n#define _LibreOfficeKitDocument LibreOfficeKitDocumentStruct' \
-        /build/lokit-headers/LibreOfficeKit/LibreOfficeKit.h
+# Download LibreOfficeKit headers from LibreOffice core master branch
+# Master branch uses '_LibreOfficeKit' struct naming which is compatible with coolwsd
+RUN mkdir -p /build/lokit-headers/LibreOfficeKit \
+    && curl -fsSL https://raw.githubusercontent.com/LibreOffice/core/master/include/LibreOfficeKit/LibreOfficeKit.h \
+        -o /build/lokit-headers/LibreOfficeKit/LibreOfficeKit.h \
+    && curl -fsSL https://raw.githubusercontent.com/LibreOffice/core/master/include/LibreOfficeKit/LibreOfficeKit.hxx \
+        -o /build/lokit-headers/LibreOfficeKit/LibreOfficeKit.hxx \
+    && curl -fsSL https://raw.githubusercontent.com/LibreOffice/core/master/include/LibreOfficeKit/LibreOfficeKitEnums.h \
+        -o /build/lokit-headers/LibreOfficeKit/LibreOfficeKitEnums.h \
+    && curl -fsSL https://raw.githubusercontent.com/LibreOffice/core/master/include/LibreOfficeKit/LibreOfficeKitInit.h \
+        -o /build/lokit-headers/LibreOfficeKit/LibreOfficeKitInit.h \
+    && curl -fsSL https://raw.githubusercontent.com/LibreOffice/core/master/include/LibreOfficeKit/LibreOfficeKitTypes.h \
+        -o /build/lokit-headers/LibreOfficeKit/LibreOfficeKitTypes.h
 
 # Build coolwsd from source with production optimizations
 WORKDIR /build/online
