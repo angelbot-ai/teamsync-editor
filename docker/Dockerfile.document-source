@@ -367,7 +367,11 @@ ENV DEBIAN_FRONTEND=noninteractive \
     MAX_CONNECTIONS=100000 \
     MAX_DOCUMENTS=10000 \
     # Disable core dumps in production
-    COOL_NO_DUMP=1
+    COOL_NO_DUMP=1 \
+    # CRITICAL: Ensure LibreOffice's bundled fontconfig/freetype/harfbuzz are used
+    # CPLinux-LOKit builds with --without-system-fontconfig/freetype/harfbuzz
+    # These libraries are in /opt/lokit/program and must be found before system libs
+    LD_LIBRARY_PATH=/opt/lokit/program
 
 # OCI Image Labels for container registries
 LABEL maintainer="TeamSync <support@teamsync.io>" \
