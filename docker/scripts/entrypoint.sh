@@ -20,6 +20,11 @@
 
 set -e
 
+# CRITICAL: Ensure LibreOffice uses its bundled fontconfig/freetype/harfbuzz
+# CPLinux-LOKit builds with --without-system-fontconfig/freetype/harfbuzz
+# These must be found before system libraries to prevent initialization hang
+export LD_LIBRARY_PATH="/opt/lokit/program:${LD_LIBRARY_PATH:-}"
+
 CONFIG_FILE="/etc/coolwsd/coolwsd.xml"
 DISCOVERY_FILE="/opt/cool/share/coolwsd/discovery.xml"
 COOL_USER="cool"
