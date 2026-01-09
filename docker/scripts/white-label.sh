@@ -17,6 +17,15 @@
 
 set -e
 
+# Cross-platform sed -i (macOS vs Linux)
+sedi() {
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        sed -i '' "$@"
+    else
+        sed -i "$@"
+    fi
+}
+
 # Configuration
 # Product name can be passed as 3rd argument, defaults to "TeamSync Editor"
 BRAND_NAME="${3:-TeamSync Editor}"
@@ -60,10 +69,10 @@ safe_replace() {
     if grep -q "Mozilla Public License" "$file" 2>/dev/null; then
         # For files with MPL headers, only replace after line 25
         # to preserve the license notice at the top
-        sed -i "25,\$ s/$old/$new/g" "$file"
+        sedi "25,\$ s/$old/$new/g" "$file"
     else
         # For files without MPL headers, replace everywhere
-        sed -i "s/$old/$new/g" "$file"
+        sedi "s/$old/$new/g" "$file"
     fi
 }
 
@@ -78,7 +87,7 @@ find ./browser/src -type f \( -name "*.js" -o -name "*.ts" -o -name "*.tsx" \) 2
 
     # Replace short name (but not in license headers)
     if ! grep -q "Mozilla Public License" "$file" 2>/dev/null; then
-        sed -i "s/\bCODE\b/$BRAND_SHORT/g" "$file"
+        sedi "s/\bCODE\b/$BRAND_SHORT/g" "$file"
     fi
 done
 
@@ -90,8 +99,8 @@ echo "[2/10] Replacing branding in HTML files..."
 find ./browser -type f -name "*.html" 2>/dev/null | while read -r file; do
     safe_replace "$file" "$ORIGINAL_BRAND" "$BRAND_NAME"
     # Replace page titles
-    sed -i "s/<title>Collabora/<title>$BRAND_NAME/g" "$file"
-    sed -i "s/<title>CODE/<title>$BRAND_NAME/g" "$file"
+    sedi "s/<title>Collabora/<title>$BRAND_NAME/g" "$file"
+    sedi "s/<title>CODE/<title>$BRAND_NAME/g" "$file"
 done
 
 # =============================================================================
@@ -101,9 +110,9 @@ echo "[3/10] Replacing branding in CSS files..."
 
 find ./browser -type f -name "*.css" 2>/dev/null | while read -r file; do
     # Replace logo references
-    sed -i 's/collabora-logo\.svg/teamsync-logo.svg/g' "$file"
-    sed -i 's/collabora-logo\.png/teamsync-logo.png/g' "$file"
-    sed -i 's/collabora_logo/teamsync_logo/g' "$file"
+    sedi 's/collabora-logo\.svg/teamsync-logo.svg/g' "$file"
+    sedi 's/collabora-logo\.png/teamsync-logo.png/g' "$file"
+    sedi 's/collabora_logo/teamsync_logo/g' "$file"
 
     # NOTE: Keep default Collabora colors - do not replace brand colors
     # This preserves the original UI look and feel
@@ -115,12 +124,12 @@ done
 echo "[4/10] Replacing branding in mobile CSS..."
 
 find ./browser -path "*mobile*" -name "*.css" 2>/dev/null | while read -r file; do
-    sed -i 's/collabora/teamsync/gi' "$file"
+    sedi 's/collabora/teamsync/gi' "$file"
 done
 
 # Also check for responsive/mobile specific files
 find ./browser -name "*mobile*.css" -o -name "*responsive*.css" 2>/dev/null | while read -r file; do
-    sed -i 's/collabora-logo/teamsync-logo/g' "$file"
+    sedi 's/collabora-logo/teamsync-logo/g' "$file"
 done
 
 # =============================================================================
@@ -144,7 +153,7 @@ echo "[6/10] Replacing branding in localization files..."
 find ./browser -type f \( -name "*.po" -o -name "*.pot" \) 2>/dev/null | while read -r file; do
     # Only replace in msgstr (translated strings), not msgid (source strings)
     # This preserves the original for reference
-    sed -i "/^msgstr/s/$ORIGINAL_BRAND/$BRAND_NAME/g" "$file"
+    sedi "/^msgstr/s/$ORIGINAL_BRAND/$BRAND_NAME/g" "$file"
 done
 
 # =============================================================================
@@ -225,8 +234,8 @@ echo "[10/10] Updating product metadata..."
 
 # Update package.json if exists
 if [ -f "./browser/package.json" ]; then
-    sed -i 's/"name": "[^"]*"/"name": "teamsync-editor"/' ./browser/package.json
-    sed -i 's/"description": "[^"]*"/"description": "TeamSync Editor - Collaborative Document Editing"/' ./browser/package.json
+    sedi 's/"name": "[^"]*"/"name": "teamsync-editor"/' ./browser/package.json
+    sedi 's/"description": "[^"]*"/"description": "TeamSync Editor - Collaborative Document Editing"/' ./browser/package.json
     echo "  Updated browser/package.json"
 fi
 
@@ -236,23 +245,23 @@ find ./browser -type f \( -name "*.js" -o -name "*.ts" -o -name "*.html" -o -nam
     # Skip node_modules
     [[ "$file" == *"node_modules"* ]] && continue
     # Remove the suffix patterns
-    sed -i 's/Development Edition (unbranded)//g' "$file" 2>/dev/null || true
-    sed -i 's/Development Edition//g' "$file" 2>/dev/null || true
-    sed -i 's/(unbranded)//g' "$file" 2>/dev/null || true
+    sedi 's/Development Edition (unbranded)//g' "$file" 2>/dev/null || true
+    sedi 's/Development Edition//g' "$file" 2>/dev/null || true
+    sedi 's/(unbranded)//g' "$file" 2>/dev/null || true
 done
 
 # Update discovery.xml references
 find . -name "discovery.xml" -type f 2>/dev/null | while read -r file; do
-    sed -i "s/Collabora Online/$BRAND_NAME/g" "$file"
-    sed -i "s/Collabora/$BRAND_SHORT/g" "$file"
+    sedi "s/Collabora Online/$BRAND_NAME/g" "$file"
+    sedi "s/Collabora/$BRAND_SHORT/g" "$file"
     echo "  Updated: $file"
 done
 
 # Update About dialog strings
 find ./browser -type f \( -name "*.js" -o -name "*.ts" \) 2>/dev/null | while read -r file; do
     # Update about dialog references
-    sed -i "s/Powered by Collabora/Powered by $BRAND_SHORT/g" "$file"
-    sed -i "s/collaboraonline\.com/teamsync.dev/g" "$file"
+    sedi "s/Powered by Collabora/Powered by $BRAND_SHORT/g" "$file"
+    sedi "s/collaboraonline\.com/teamsync.dev/g" "$file"
 done
 
 # =============================================================================

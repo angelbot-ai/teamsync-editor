@@ -68,24 +68,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /build
 
-# Clone Collabora Online source (25.04 branch)
-ARG COOL_VERSION=distro/collabora/co-25.04
+# Clone TeamSync fork with pre-applied branding (teamsync-25.04 branch)
+# This eliminates runtime patching - branding is already committed
+ARG COOL_VERSION=teamsync-25.04
 RUN git clone --depth 1 --single-branch --branch ${COOL_VERSION} \
-    https://github.com/CollaboraOnline/online.git
+    https://github.com/angelbot-ai-pvt-ltd/editor-source.git online
 
-# Copy branding assets and apply white-label
-# Product name: TeamSync Presentation Editor v1.0.0
-COPY docker/branding/presentation/ /build/branding/
+# Copy LICENSE_NOTICE for compliance
 COPY docker/branding/LICENSE_NOTICE.txt /build/branding/
-COPY docker/scripts/white-label.sh /build/white-label.sh
-RUN chmod +x /build/white-label.sh \
-    && /build/white-label.sh /build/online /build/branding "TeamSync Presentation Editor" "1.0.0"
-
-# Replace logo files if provided
-RUN if [ -f /build/branding/images/logo.svg ]; then \
-        find /build/online/browser -type f \( -name "collabora-logo*.svg" -o -name "loleaflet-logo*.svg" \) \
-            -exec cp /build/branding/images/logo.svg {} \; 2>/dev/null || true; \
-    fi
 
 # Install npm dependencies for browser build
 WORKDIR /build/online/browser
