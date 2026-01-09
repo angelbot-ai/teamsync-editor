@@ -81,20 +81,10 @@ COPY docker/branding/LICENSE_NOTICE.txt /build/branding/
 WORKDIR /build/online/browser
 RUN npm install --no-audit
 
-# Download LibreOfficeKit headers from Collabora 25.04 branch (MUST match runtime packages)
-# Using co-25.04 branch ensures ABI compatibility with collaboraofficebasis packages
-ARG LOKIT_BRANCH=distro/collabora/co-25.04
-RUN mkdir -p /build/lokit-headers/LibreOfficeKit \
-    && curl -fsSL https://raw.githubusercontent.com/LibreOffice/core/${LOKIT_BRANCH}/include/LibreOfficeKit/LibreOfficeKit.h \
-        -o /build/lokit-headers/LibreOfficeKit/LibreOfficeKit.h \
-    && curl -fsSL https://raw.githubusercontent.com/LibreOffice/core/${LOKIT_BRANCH}/include/LibreOfficeKit/LibreOfficeKit.hxx \
-        -o /build/lokit-headers/LibreOfficeKit/LibreOfficeKit.hxx \
-    && curl -fsSL https://raw.githubusercontent.com/LibreOffice/core/${LOKIT_BRANCH}/include/LibreOfficeKit/LibreOfficeKitEnums.h \
-        -o /build/lokit-headers/LibreOfficeKit/LibreOfficeKitEnums.h \
-    && curl -fsSL https://raw.githubusercontent.com/LibreOffice/core/${LOKIT_BRANCH}/include/LibreOfficeKit/LibreOfficeKitInit.h \
-        -o /build/lokit-headers/LibreOfficeKit/LibreOfficeKitInit.h \
-    && curl -fsSL https://raw.githubusercontent.com/LibreOffice/core/${LOKIT_BRANCH}/include/LibreOfficeKit/LibreOfficeKitTypes.h \
-        -o /build/lokit-headers/LibreOfficeKit/LibreOfficeKitTypes.h
+# Use LibreOfficeKit headers from the installed coolwsd package
+# These headers are bundled with coolwsd and match the Collabora LibreOffice packages
+RUN mkdir -p /build/lokit-headers \
+    && cp -r /usr/include/LibreOfficeKit /build/lokit-headers/
 
 # Build coolwsd from source with production optimizations
 WORKDIR /build/online
