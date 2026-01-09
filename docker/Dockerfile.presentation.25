@@ -85,7 +85,12 @@ RUN npm install --no-audit
 # These headers are maintained by Collabora and match the 25.04 packages
 ARG LOKIT_HEADERS_URL=https://github.com/CollaboraOnline/online/releases/download/for-code-assets/LibreOfficeKit-includes-co-25.04.tar.gz
 RUN mkdir -p /build/lokit-headers \
-    && curl -fsSL ${LOKIT_HEADERS_URL} | tar -xzf - -C /build/lokit-headers --strip-components=1
+    && curl -fsSL ${LOKIT_HEADERS_URL} | tar -xzf - -C /build/lokit-headers --strip-components=1 \
+    # Add compatibility typedefs for coolwsd 25.04 branch which expects _LibreOfficeKit struct names
+    && sed -i '/typedef struct LibreOfficeKitStruct LibreOfficeKit;/a typedef struct LibreOfficeKitStruct _LibreOfficeKit;' \
+        /build/lokit-headers/LibreOfficeKit/LibreOfficeKit.h \
+    && sed -i '/typedef struct LibreOfficeKitDocumentStruct LibreOfficeKitDocument;/a typedef struct LibreOfficeKitDocumentStruct _LibreOfficeKitDocument;' \
+        /build/lokit-headers/LibreOfficeKit/LibreOfficeKit.h
 
 # Build coolwsd from source with production optimizations
 WORKDIR /build/online
