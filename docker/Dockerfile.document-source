@@ -179,9 +179,10 @@ WORKDIR ${LO_BUILD_DIR}
 # - --without-system-icu: Ubuntu 24.04 ICU 74 has breakiterator issues
 # - --with-lang=en-US: English-only (faster build, smaller image)
 # - --disable-extensions: Remove extension support (reduces size)
-# - --disable-scripting: Remove BASIC, Java, Python scripting
-# - --disable-avmedia: Disable audio/video media embedding
 # - --enable-pch: Precompiled headers for faster builds
+#
+# NOTE: Do NOT use --disable-scripting or --disable-avmedia - they conflict
+# with --enable-mergelibs because vbaevents/vbahelper are part of merged libs
 RUN echo "==> Configuring LibreOffice build with CPLinux-LOKit distro..." \
     && ./autogen.sh \
     --with-distro=CPLinux-LOKit \
@@ -189,8 +190,6 @@ RUN echo "==> Configuring LibreOffice build with CPLinux-LOKit distro..." \
     --without-system-icu \
     --with-lang=en-US \
     --disable-extensions \
-    --disable-scripting \
-    --disable-avmedia \
     --enable-pch \
     --with-parallelism=$(nproc) 2>&1 | tee /build/configure.log
 
