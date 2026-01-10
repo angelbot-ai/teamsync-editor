@@ -1,0 +1,281 @@
+# =============================================================================
+# TeamSync Document - OPTIMIZED Build (Writer Only) - Target: ~700 MB
+# =============================================================================
+#
+# Uses Collabora 25.04 component-specific packages with source-built coolwsd
+# This allows installing ONLY Writer (no Calc/Impress) for smaller images
+#
+# Handles: .docx, .doc, .odt, .rtf, .txt
+# Target size: ~700 MB
+# License: MPL 2.0 Compliant
+#
+# OPTIMIZATIONS:
+# - Use Poco runtime libs instead of libpoco-dev
+# - Skip systemplate generation (not needed with mount_jail_tree=false)
+# - Remove duplicate coolwsd files from packages
+# - Remove help files, wizards, templates, galleries (~150 MB savings)
+# - Strip all LibreOffice binaries (~50-100 MB savings)
+# - Remove unused locales and autocorrect files (~20-30 MB savings)
+#
+# =============================================================================
+
+# =============================================================================
+# STAGE 1: coolwsd Builder - Build from source with 25.04 packages
+# =============================================================================
+FROM debian:bookworm-slim AS coolwsd-builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install base dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    gnupg2 \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Add 25.04 CODE repository
+RUN curl -fsSL https://www.collaboraoffice.com/downloads/gpg/collaboraonline-release-keyring.gpg \
+        -o /usr/share/keyrings/collaboraonline-release-keyring.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/collaboraonline-release-keyring.gpg] https://www.collaboraoffice.com/repos/CollaboraOnline/CODE-deb /" \
+        > /etc/apt/sources.list.d/collaboraonline.list \
+    && apt-get update
+
+# Install ONLY Writer component + coolwsd for LOKit headers
+RUN apt-get install -y --no-install-recommends \
+    collaboraofficebasis-core \
+    collaboraofficebasis-writer \
+    collaboraofficebasis-graphicfilter \
+    collaboraofficebasis-ooofonts \
+    collaboraofficebasis-en-us \
+    collaboraoffice-ure \
+    coolwsd \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install build dependencies for coolwsd source build
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    git \
+    automake \
+    autoconf \
+    libtool \
+    pkg-config \
+    libcap-dev \
+    libpng-dev \
+    libssl-dev \
+    libpam-dev \
+    libzstd-dev \
+    libpoco-dev \
+    libcppunit-dev \
+    python3 \
+    python3-lxml \
+    python3-polib \
+    nodejs \
+    npm \
+    rsync \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+# Clone TeamSync fork with pre-applied branding (teamsync-25.04 branch)
+# This eliminates runtime patching - branding is already committed
+ARG COOL_VERSION=teamsync-25.04
+RUN git clone --depth 1 --single-branch --branch ${COOL_VERSION} \
+    https://github.com/angelbot-ai-pvt-ltd/editor-source.git online
+
+# Copy LICENSE_NOTICE for compliance
+COPY docker/branding/LICENSE_NOTICE.txt /build/branding/
+
+# Install npm dependencies for browser build
+WORKDIR /build/online/browser
+RUN npm install --no-audit
+
+# Download LibreOfficeKit headers from LibreOffice core master branch
+# Master branch uses '_LibreOfficeKit' struct naming which is compatible with coolwsd
+RUN mkdir -p /build/lokit-headers/LibreOfficeKit \
+    && curl -fsSL https://raw.githubusercontent.com/LibreOffice/core/master/include/LibreOfficeKit/LibreOfficeKit.h \
+        -o /build/lokit-headers/LibreOfficeKit/LibreOfficeKit.h \
+    && curl -fsSL https://raw.githubusercontent.com/LibreOffice/core/master/include/LibreOfficeKit/LibreOfficeKit.hxx \
+        -o /build/lokit-headers/LibreOfficeKit/LibreOfficeKit.hxx \
+    && curl -fsSL https://raw.githubusercontent.com/LibreOffice/core/master/include/LibreOfficeKit/LibreOfficeKitEnums.h \
+        -o /build/lokit-headers/LibreOfficeKit/LibreOfficeKitEnums.h \
+    && curl -fsSL https://raw.githubusercontent.com/LibreOffice/core/master/include/LibreOfficeKit/LibreOfficeKitInit.h \
+        -o /build/lokit-headers/LibreOfficeKit/LibreOfficeKitInit.h \
+    && curl -fsSL https://raw.githubusercontent.com/LibreOffice/core/master/include/LibreOfficeKit/LibreOfficeKitTypes.h \
+        -o /build/lokit-headers/LibreOfficeKit/LibreOfficeKitTypes.h
+
+# Build coolwsd from source with production optimizations
+WORKDIR /build/online
+RUN ./autogen.sh && ./configure \
+    --prefix=/opt/cool \
+    --with-lokit-path=/build/lokit-headers \
+    --with-lo-path=/opt/collaboraoffice \
+    --disable-setcap \
+    --disable-debug \
+    --enable-silent-rules \
+    CXXFLAGS="-O2 -g0" \
+    CFLAGS="-O2 -g0"
+
+RUN make -j$(nproc)
+RUN make DESTDIR=/install install
+
+# Strip debug symbols for smaller, faster binaries
+RUN find /install -type f \( -name "*.so" -o -name "*.so.*" -o -name "coolwsd" -o -name "coolforkit" \) \
+    -exec strip --strip-unneeded {} \; 2>/dev/null || true
+
+# =============================================================================
+# STAGE 2: Runtime - WRITER ONLY (~700 MB target)
+# =============================================================================
+FROM debian:bookworm-slim AS runtime
+
+# Production environment configuration
+ENV DEBIAN_FRONTEND=noninteractive \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
+    TEAMSYNC_PRODUCT="document" \
+    # Collabora Online performance tuning defaults
+    MEMPROPORTION=80.0 \
+    MAX_CONNECTIONS=100000 \
+    MAX_DOCUMENTS=10000 \
+    # Disable core dumps in production
+    COOL_NO_DUMP=1
+
+# OCI Image Labels
+LABEL maintainer="TeamSync <support@teamsync.io>" \
+      org.opencontainers.image.title="TeamSync Document (Optimized)" \
+      org.opencontainers.image.description="Size-optimized collaborative word processing" \
+      org.opencontainers.image.licenses="MPL-2.0" \
+      org.opencontainers.image.vendor="TeamSync" \
+      org.opencontainers.image.source="https://github.com/angelbot-ai-pvt-ltd/teamsync-editor" \
+      teamsync.product="document" \
+      teamsync.filetypes="docx,doc,odt,rtf,txt" \
+      teamsync.version="optimized"
+
+# Install base dependencies with Poco RUNTIME libraries only (not -dev)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    gnupg2 \
+    ca-certificates \
+    libcap2-bin \
+    fontconfig \
+    fonts-liberation \
+    hunspell \
+    hunspell-en-us \
+    locales \
+    tzdata \
+    # Poco RUNTIME libraries only (coolwsd dependencies)
+    libpocofoundation80 \
+    libpoconet80 \
+    libpoconetssl80 \
+    libpococrypto80 \
+    libpocoxml80 \
+    libpocoutil80 \
+    libpocojson80 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Add 25.04 CODE repository and install ONLY Writer component
+# Then perform AGGRESSIVE CLEANUP to reduce image size
+RUN curl -fsSL https://www.collaboraoffice.com/downloads/gpg/collaboraonline-release-keyring.gpg \
+        -o /usr/share/keyrings/collaboraonline-release-keyring.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/collaboraonline-release-keyring.gpg] https://www.collaboraoffice.com/repos/CollaboraOnline/CODE-deb /" \
+        > /etc/apt/sources.list.d/collaboraonline.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+        # Core runtime (REQUIRED)
+        collaboraofficebasis-core \
+        collaboraoffice-ure \
+        # Writer ONLY (no calc, impress)
+        collaboraofficebasis-writer \
+        # Supporting packages
+        collaboraofficebasis-graphicfilter \
+        collaboraofficebasis-ooofonts \
+        collaboraofficebasis-en-us \
+        # coolwsd-deprecated for coolforkit-caps (Railway compatibility)
+        coolwsd-deprecated \
+    # =========================================================================
+    # AGGRESSIVE CLEANUP - Remove unused LibreOffice components (~200-250 MB)
+    # =========================================================================
+    # Remove package-installed coolwsd files (we use source-built version)
+    && rm -rf /usr/bin/coolwsd /usr/bin/coolforkit /usr/bin/coolmount \
+              /usr/share/coolwsd /etc/coolwsd \
+    # Remove help files (~50 MB)
+    && rm -rf /opt/collaboraoffice/help \
+    # Remove wizards (~20 MB)
+    && rm -rf /opt/collaboraoffice/share/wizards \
+    # Remove gallery/clipart (~30 MB)
+    && rm -rf /opt/collaboraoffice/share/gallery \
+    # Remove templates (~10 MB)
+    && rm -rf /opt/collaboraoffice/share/template \
+    # Remove samples
+    && rm -rf /opt/collaboraoffice/share/samples \
+    # Remove unused extensions (~20 MB)
+    && rm -rf /opt/collaboraoffice/share/extensions/nlpsolver \
+              /opt/collaboraoffice/share/extensions/wiki-publisher \
+    # Remove basic presets
+    && rm -rf /opt/collaboraoffice/presets/basic \
+    # Remove unused config modules (database, forms, reports)
+    && rm -rf /opt/collaboraoffice/share/config/soffice.cfg/modules/swform \
+              /opt/collaboraoffice/share/config/soffice.cfg/modules/swreport \
+              /opt/collaboraoffice/share/config/soffice.cfg/modules/dbapp \
+              /opt/collaboraoffice/share/config/soffice.cfg/modules/dbbrowser \
+    # Remove non-English autocorrection files
+    && find /opt/collaboraoffice/share/autocorr -type f ! -name "acor_en*" -delete 2>/dev/null || true \
+    # Strip debug symbols from LibreOffice binaries (~50-100 MB)
+    && find /opt/collaboraoffice -type f \( -name "*.so" -o -name "*.so.*" \) \
+        -exec strip --strip-unneeded {} \; 2>/dev/null || true \
+    # Final cleanup
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# Build fontconfig cache
+RUN fc-cache -fv
+
+# Copy source-built coolwsd binaries (with branding)
+COPY --from=coolwsd-builder /install/opt/cool/ /opt/cool/
+
+# Copy runtime branding files to browser directory
+# These are served at /browser/{version}/branding.css, etc.
+COPY docker/branding/document/branding.css /opt/cool/share/coolwsd/browser/dist/branding.css
+COPY docker/branding/document/branding.js /opt/cool/share/coolwsd/browser/dist/branding.js
+COPY docker/branding/document/branding-desktop.css /opt/cool/share/coolwsd/browser/dist/branding-desktop.css
+
+# Copy license notice
+COPY docker/branding/LICENSE_NOTICE.txt /opt/cool/LICENSE_NOTICE.txt
+
+# Ensure cool user and group exist (may already be created by coolwsd-deprecated package)
+# Create directories and set permissions in a single layer
+RUN (getent group cool || groupadd -r cool) \
+    && (getent passwd cool || useradd -r -g cool -d /opt/cool -s /bin/false cool) \
+    && mkdir -p /opt/cool/child-roots \
+                /opt/cool/systemplate \
+                /opt/cool/etc/coolwsd \
+                /var/log/coolwsd \
+                /var/cache/coolwsd \
+                /tmp/coolwsd \
+                /tmp/ssl \
+    && chown -R cool:cool /opt/cool \
+                          /var/log/coolwsd \
+                          /var/cache/coolwsd \
+                          /tmp/coolwsd \
+                          /tmp/ssl \
+    # Set capabilities on coolforkit-caps for local testing
+    # On Railway, capabilities won't be available but coolforkit-caps handles this gracefully
+    && setcap cap_fowner,cap_chown,cap_sys_chroot=ep /opt/cool/bin/coolforkit-caps 2>/dev/null || true
+
+# Note: Skipping systemplate generation - not needed with mount_jail_tree=false
+# The entrypoint configures coolwsd to use copy-based jails which work on Railway
+
+# Copy entrypoint script
+COPY --chmod=755 docker/scripts/entrypoint-25.sh /start.sh
+
+# Expose default port
+EXPOSE 9980
+
+# Production-ready healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --start-period=180s --retries=3 \
+    CMD curl -sf http://localhost:${PORT:-9980}/hosting/discovery > /dev/null || exit 1
+
+WORKDIR /opt/cool
+
+# Run as cool user (required by coolwsd - it refuses to run as root)
+USER cool
+
+ENTRYPOINT ["/start.sh"]
