@@ -1,13 +1,19 @@
 # =============================================================================
-# TeamSync Presentation - 25.04 Component Build (Impress Only)
+# TeamSync Presentation - 25.04 Component Build (Impress Only) - OPTIMIZED
 # =============================================================================
 #
-# EXPERIMENTAL: Uses Collabora 25.04 component-specific packages
+# Uses Collabora 25.04 component-specific packages with source-built coolwsd
 # This allows installing ONLY Impress (no Writer/Calc) for smaller images
 #
 # Handles: .pptx, .ppt, .odp
-# Target size: ~600-800 MB (vs ~2GB with full LibreOffice)
+# Target size: ~700-800 MB
 # License: MPL 2.0 Compliant
+#
+# OPTIMIZATIONS vs previous version:
+# - Use Poco runtime libs instead of libpoco-dev (~200-300 MB savings)
+# - Skip systemplate generation (not needed with mount_jail_tree=false)
+# - Remove duplicate coolwsd files from packages
+# - Single cleanup layer for smaller image
 #
 # =============================================================================
 
@@ -115,7 +121,7 @@ RUN find /install -type f \( -name "*.so" -o -name "*.so.*" -o -name "coolwsd" -
     -exec strip --strip-unneeded {} \; 2>/dev/null || true
 
 # =============================================================================
-# STAGE 2: Runtime - IMPRESS ONLY (~600-800 MB target)
+# STAGE 2: Runtime - IMPRESS ONLY (~700-800 MB target)
 # =============================================================================
 FROM debian:bookworm-slim AS runtime
 
@@ -142,7 +148,8 @@ LABEL maintainer="TeamSync <support@teamsync.io>" \
       teamsync.filetypes="pptx,ppt,odp" \
       teamsync.version="25.04"
 
-# Install base dependencies including Poco runtime libraries (required by coolwsd)
+# Install base dependencies with Poco RUNTIME libraries only (not -dev)
+# This saves ~200-300 MB compared to libpoco-dev
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     gnupg2 \
@@ -154,11 +161,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     hunspell-en-us \
     locales \
     tzdata \
-    # Poco runtime libraries (coolwsd links against these)
-    libpoco-dev \
+    # Poco RUNTIME libraries only (coolwsd dependencies)
+    libpocofoundation80 \
+    libpoconet80 \
+    libpoconetssl80 \
+    libpococrypto80 \
+    libpocoxml80 \
+    libpocoutil80 \
+    libpocojson80 \
     && rm -rf /var/lib/apt/lists/*
 
 # Add 25.04 CODE repository and install ONLY Impress component
+# Note: We only need coolforkit-caps from coolwsd-deprecated, not the full coolwsd
 RUN curl -fsSL https://www.collaboraoffice.com/downloads/gpg/collaboraonline-release-keyring.gpg \
         -o /usr/share/keyrings/collaboraonline-release-keyring.gpg \
     && echo "deb [signed-by=/usr/share/keyrings/collaboraonline-release-keyring.gpg] https://www.collaboraoffice.com/repos/CollaboraOnline/CODE-deb /" \
@@ -176,8 +190,11 @@ RUN curl -fsSL https://www.collaboraoffice.com/downloads/gpg/collaboraonline-rel
         collaboraofficebasis-en-us \
         # coolwsd-deprecated for coolforkit-caps (Railway compatibility)
         coolwsd-deprecated \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+    # Remove package-installed coolwsd files (we use source-built version)
+    # Keep only coolforkit-caps which handles no-capability environments
+    && rm -rf /usr/bin/coolwsd /usr/bin/coolforkit /usr/bin/coolmount \
+              /usr/share/coolwsd /etc/coolwsd \
+              /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # Build fontconfig cache
 RUN fc-cache -fv
@@ -195,31 +212,27 @@ COPY docker/branding/presentation/branding-desktop.css /opt/cool/share/coolwsd/b
 COPY docker/branding/LICENSE_NOTICE.txt /opt/cool/LICENSE_NOTICE.txt
 
 # Ensure cool user and group exist (may already be created by coolwsd-deprecated package)
-RUN getent group cool || groupadd -r cool \
-    && getent passwd cool || useradd -r -g cool -d /opt/cool -s /bin/false cool
-
-# Set capabilities on coolforkit-caps for local testing
-# On Railway, capabilities won't be available but coolforkit-caps handles this gracefully
-RUN setcap cap_fowner,cap_chown,cap_sys_chroot=ep /opt/cool/bin/coolforkit-caps 2>/dev/null || true
-
-# Create required directories with proper ownership
-RUN mkdir -p /opt/cool/child-roots \
-    && mkdir -p /opt/cool/systemplate \
-    && mkdir -p /opt/cool/etc/coolwsd \
-    && mkdir -p /var/log/coolwsd \
-    && mkdir -p /var/cache/coolwsd \
-    && mkdir -p /tmp/coolwsd \
-    && mkdir -p /tmp/ssl \
+# Create directories and set permissions in a single layer
+RUN (getent group cool || groupadd -r cool) \
+    && (getent passwd cool || useradd -r -g cool -d /opt/cool -s /bin/false cool) \
+    && mkdir -p /opt/cool/child-roots \
+                /opt/cool/systemplate \
+                /opt/cool/etc/coolwsd \
+                /var/log/coolwsd \
+                /var/cache/coolwsd \
+                /tmp/coolwsd \
+                /tmp/ssl \
     && chown -R cool:cool /opt/cool \
-    && chown -R cool:cool /var/log/coolwsd \
-    && chown -R cool:cool /var/cache/coolwsd \
-    && chown -R cool:cool /tmp/coolwsd \
-    && chown -R cool:cool /tmp/ssl
+                          /var/log/coolwsd \
+                          /var/cache/coolwsd \
+                          /tmp/coolwsd \
+                          /tmp/ssl \
+    # Set capabilities on coolforkit-caps for local testing
+    # On Railway, capabilities won't be available but coolforkit-caps handles this gracefully
+    && setcap cap_fowner,cap_chown,cap_sys_chroot=ep /opt/cool/bin/coolforkit-caps 2>/dev/null || true
 
-# Generate systemplate for jail setup (faster bind-mount instead of copy)
-RUN /opt/cool/bin/coolwsd-systemplate-setup /opt/cool/systemplate /opt/collaboraoffice 2>/dev/null || \
-    /usr/bin/coolwsd-systemplate-setup /opt/cool/systemplate /opt/collaboraoffice 2>/dev/null || \
-    echo "Warning: systemplate setup skipped - will use copy-based jails"
+# Note: Skipping systemplate generation - not needed with mount_jail_tree=false
+# The entrypoint configures coolwsd to use copy-based jails which work on Railway
 
 # Copy entrypoint script
 COPY --chmod=755 docker/scripts/entrypoint-25.sh /start.sh
