@@ -192,22 +192,34 @@ RUN curl -fsSL https://www.collaboraoffice.com/downloads/gpg/collaboraonline-rel
         # coolwsd-deprecated for coolforkit-caps (Railway compatibility)
         coolwsd-deprecated \
     # =========================================================================
-    # AGGRESSIVE CLEANUP - Remove unused LibreOffice components (~200-250 MB)
+    # DEBUG: Show sizes before cleanup
+    # =========================================================================
+    && echo "=== BEFORE CLEANUP ===" \
+    && echo "--- Top directories in /opt/collaboraoffice ---" \
+    && du -sh /opt/collaboraoffice/* 2>/dev/null | sort -rh || true \
+    && echo "--- /opt/collaboraoffice/share subdirs ---" \
+    && du -sh /opt/collaboraoffice/share/* 2>/dev/null | sort -rh | head -20 || true \
+    && echo "--- /opt/collaboraoffice/program ---" \
+    && du -sh /opt/collaboraoffice/program 2>/dev/null || true \
+    && echo "--- Total /opt/collaboraoffice ---" \
+    && du -sh /opt/collaboraoffice 2>/dev/null || true \
+    # =========================================================================
+    # AGGRESSIVE CLEANUP - Remove unused LibreOffice components
     # =========================================================================
     # Remove package-installed coolwsd files (we use source-built version)
     && rm -rf /usr/bin/coolwsd /usr/bin/coolforkit /usr/bin/coolmount \
               /usr/share/coolwsd /etc/coolwsd \
-    # Remove help files (~50 MB)
+    # Remove help files
     && rm -rf /opt/collaboraoffice/help \
-    # Remove wizards (~20 MB)
+    # Remove wizards
     && rm -rf /opt/collaboraoffice/share/wizards \
-    # Remove gallery/clipart (~30 MB)
+    # Remove gallery/clipart
     && rm -rf /opt/collaboraoffice/share/gallery \
-    # Remove templates (~10 MB)
+    # Remove templates
     && rm -rf /opt/collaboraoffice/share/template \
     # Remove samples
     && rm -rf /opt/collaboraoffice/share/samples \
-    # Remove unused extensions (~20 MB)
+    # Remove unused extensions
     && rm -rf /opt/collaboraoffice/share/extensions/nlpsolver \
               /opt/collaboraoffice/share/extensions/wiki-publisher \
     # Remove basic presets
@@ -219,9 +231,17 @@ RUN curl -fsSL https://www.collaboraoffice.com/downloads/gpg/collaboraonline-rel
               /opt/collaboraoffice/share/config/soffice.cfg/modules/dbbrowser \
     # Remove non-English autocorrection files
     && find /opt/collaboraoffice/share/autocorr -type f ! -name "acor_en*" -delete 2>/dev/null || true \
-    # Strip debug symbols from LibreOffice binaries (~50-100 MB)
+    # Strip debug symbols from LibreOffice binaries
     && find /opt/collaboraoffice -type f \( -name "*.so" -o -name "*.so.*" \) \
         -exec strip --strip-unneeded {} \; 2>/dev/null || true \
+    # =========================================================================
+    # DEBUG: Show sizes after cleanup
+    # =========================================================================
+    && echo "=== AFTER CLEANUP ===" \
+    && echo "--- Top directories in /opt/collaboraoffice ---" \
+    && du -sh /opt/collaboraoffice/* 2>/dev/null | sort -rh || true \
+    && echo "--- Total /opt/collaboraoffice ---" \
+    && du -sh /opt/collaboraoffice 2>/dev/null || true \
     # Final cleanup
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
