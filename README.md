@@ -155,25 +155,9 @@ This project uses Collabora Online under the Mozilla Public License 2.0:
 - ✅ Only user-visible branding modified
 - ✅ Source code available as required
 
-## Troubleshooting
-
-### Collabora not starting
-```bash
-docker compose logs office-server
-```
-
-### WOPI token errors
-```bash
-docker compose logs wopi-host
-```
-
-### MinIO connection issues
-```bash
-docker compose exec minio mc admin info local
-```
 
 ## License
 
-- **TeamSync Editor Code**: MIT License
+- **TeamSync Editor Code**: Mozilla Public License 2.0
 - **Collabora Online**: Mozilla Public License 2.0
 - **LibreOffice Core**: Mozilla Public License 2.0
