@@ -98,15 +98,16 @@ RUN curl -fsSL https://www.collaboraoffice.com/downloads/gpg/collaboraonline-rel
 # Download and extract prebuilt coolwsd artifacts
 # This replaces the entire coolwsd-builder stage from the source build
 RUN echo "Downloading prebuilt coolwsd artifacts: ${COOLWSD_VERSION}" \
+    && cd /tmp \
     && curl -fsSL "${ARTIFACT_BASE_URL}/${COOLWSD_VERSION}/coolwsd-teamsync-${COOLWSD_VERSION}.tar.gz" \
-        -o /tmp/coolwsd.tar.gz \
+        -o "coolwsd-teamsync-${COOLWSD_VERSION}.tar.gz" \
     && curl -fsSL "${ARTIFACT_BASE_URL}/${COOLWSD_VERSION}/coolwsd-teamsync-${COOLWSD_VERSION}.tar.gz.sha256" \
-        -o /tmp/coolwsd.tar.gz.sha256 \
+        -o "coolwsd-teamsync-${COOLWSD_VERSION}.tar.gz.sha256" \
     && echo "Verifying checksum..." \
-    && cd /tmp && sha256sum -c coolwsd.tar.gz.sha256 \
+    && sha256sum -c "coolwsd-teamsync-${COOLWSD_VERSION}.tar.gz.sha256" \
     && echo "Extracting artifacts..." \
-    && tar -xzf /tmp/coolwsd.tar.gz -C / \
-    && rm -rf /tmp/coolwsd.tar.gz /tmp/coolwsd.tar.gz.sha256 \
+    && tar -xzf "coolwsd-teamsync-${COOLWSD_VERSION}.tar.gz" -C / \
+    && rm -rf /tmp/coolwsd-teamsync-* \
     && echo "Prebuilt coolwsd installed successfully"
 
 # Build fontconfig cache
