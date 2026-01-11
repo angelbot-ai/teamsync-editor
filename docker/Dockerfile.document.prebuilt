@@ -17,7 +17,7 @@
 # =============================================================================
 
 # Build arguments for artifact version
-ARG COOLWSD_VERSION=v25.04-teamsync.5
+ARG COOLWSD_VERSION=v25.04-teamsync.6
 ARG ARTIFACT_BASE_URL=https://github.com/angelbot-ai-pvt-ltd/editor-source/releases/download
 
 FROM debian:bookworm-slim AS runtime
