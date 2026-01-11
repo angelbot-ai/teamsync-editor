@@ -1,19 +1,22 @@
 # =============================================================================
-# TeamSync Sheets - 25.04 Component Build (Calc Only) - OPTIMIZED
+# TeamSync Sheets - 25.04 Component Build (Calc Only) - AGGRESSIVE OPTIMIZATION
 # =============================================================================
 #
 # Uses Collabora 25.04 component-specific packages with source-built coolwsd
 # This allows installing ONLY Calc (no Writer/Impress) for smaller images
 #
 # Handles: .xlsx, .xls, .ods, .csv
-# Target size: ~700-800 MB
+# Target size: ~700 MB
 # License: MPL 2.0 Compliant
 #
-# OPTIMIZATIONS vs previous version:
-# - Use Poco runtime libs instead of libpoco-dev (~200-300 MB savings)
+# OPTIMIZATIONS:
+# - Use Poco runtime libs instead of libpoco-dev
 # - Skip systemplate generation (not needed with mount_jail_tree=false)
 # - Remove duplicate coolwsd files from packages
-# - Single cleanup layer for smaller image
+# - Remove unused fonts (keep only essential fonts)
+# - Remove help files, wizards, templates, galleries
+# - Strip all LibreOffice binaries
+# - Remove unused locales
 #
 # =============================================================================
 

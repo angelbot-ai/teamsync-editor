@@ -25,12 +25,15 @@ class TeamSyncApp {
         this.currentToken = null;
         this.isConnected = false;
         this.currentFilter = 'all';
-        this.useUnifiedEditor = localStorage.getItem('useUnifiedEditor') === 'true';
+        // Editor modes: 'teamsync-unified' | 'multi-editor' | 'collabora' | 'document-source'
+        this.editorMode = localStorage.getItem('editorMode') || 'teamsync-unified';
         this.serviceStatus = {
             'teamsync-document': 'checking',
             'teamsync-sheets': 'checking',
             'teamsync-presentation': 'checking',
-            'teamsync-editor': 'checking'
+            'teamsync-editor': 'checking',
+            'collabora': 'checking',
+            'document-source': 'checking'
         };
 
         // File type mappings
@@ -75,8 +78,8 @@ class TeamSyncApp {
             statusDocument: document.getElementById('status-document'),
             statusSheets: document.getElementById('status-sheets'),
             statusPresentation: document.getElementById('status-presentation'),
-            unifiedEditorToggle: document.getElementById('unified-editor-toggle'),
-            editorModeToggle: document.querySelector('.editor-mode-toggle'),
+            editorModeSelector: document.querySelector('.editor-mode-selector'),
+            editorModeOptions: document.querySelectorAll('input[name="editor-mode"]'),
         };
 
         this.selectedUploadType = 'document';
@@ -95,12 +98,14 @@ class TeamSyncApp {
     }
 
     /**
-     * Initialize the editor mode toggle switch
+     * Initialize the editor mode selector
      */
     initEditorModeToggle() {
         // Set initial state from localStorage
-        if (this.elements.unifiedEditorToggle) {
-            this.elements.unifiedEditorToggle.checked = this.useUnifiedEditor;
+        if (this.elements.editorModeOptions) {
+            this.elements.editorModeOptions.forEach(option => {
+                option.checked = option.value === this.editorMode;
+            });
             this.updateEditorModeUI();
         }
     }
@@ -109,21 +114,25 @@ class TeamSyncApp {
      * Update the UI to reflect current editor mode
      */
     updateEditorModeUI() {
-        if (this.elements.editorModeToggle) {
-            if (this.useUnifiedEditor) {
-                this.elements.editorModeToggle.classList.add('unified');
+        // Update the mode selector visual state
+        document.querySelectorAll('.mode-option').forEach(option => {
+            const input = option.querySelector('input');
+            if (input && input.value === this.editorMode) {
+                option.classList.add('active');
             } else {
-                this.elements.editorModeToggle.classList.remove('unified');
+                option.classList.remove('active');
             }
-        }
+        });
     }
 
     /**
-     * Toggle between unified and multi-app editor modes
+     * Change editor mode (teamsync-unified, multi-editor, or collabora)
      */
-    async toggleEditorMode() {
-        this.useUnifiedEditor = !this.useUnifiedEditor;
-        localStorage.setItem('useUnifiedEditor', this.useUnifiedEditor);
+    async setEditorMode(mode) {
+        if (mode === this.editorMode) return;
+
+        this.editorMode = mode;
+        localStorage.setItem('editorMode', mode);
         this.updateEditorModeUI();
 
         // Close any open document when switching modes
@@ -136,7 +145,7 @@ class TeamSyncApp {
             await fetch(`${this.config.apiBaseUrl}/config/editor-mode`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ useUnifiedEditor: this.useUnifiedEditor })
+                body: JSON.stringify({ editorMode: mode })
             });
         } catch (error) {
             console.warn('Could not update server editor mode:', error);
@@ -146,8 +155,13 @@ class TeamSyncApp {
         await this.checkConnection();
 
         // Show feedback
-        const mode = this.useUnifiedEditor ? 'Unified Editor' : 'Multi-App';
-        this.showSuccess(`Switched to ${mode} mode`);
+        const modeNames = {
+            'teamsync-unified': 'TeamSync Editor',
+            'multi-editor': 'Multi-Editor',
+            'collabora': 'Collabora',
+            'document-source': 'Doc Source'
+        };
+        this.showSuccess(`Switched to ${modeNames[mode]} mode`);
     }
 
     bindEvents() {
@@ -204,9 +218,11 @@ class TeamSyncApp {
             tab.addEventListener('click', () => this.setFilter(tab.dataset.filter));
         });
 
-        // Editor mode toggle
-        if (this.elements.unifiedEditorToggle) {
-            this.elements.unifiedEditorToggle.addEventListener('change', () => this.toggleEditorMode());
+        // Editor mode selector (3-way toggle)
+        if (this.elements.editorModeOptions) {
+            this.elements.editorModeOptions.forEach(option => {
+                option.addEventListener('change', (e) => this.setEditorMode(e.target.value));
+            });
         }
 
         // Listen for messages from the editor iframe
@@ -330,11 +346,21 @@ class TeamSyncApp {
         const container = this.elements.serviceIndicators;
         if (!container) return;
 
-        if (this.useUnifiedEditor) {
-            // Show single unified editor indicator
+        if (this.editorMode === 'teamsync-unified') {
+            // Show single TeamSync Editor indicator
             const status = this.serviceStatus['teamsync-editor'];
             const healthClass = status === 'healthy' ? 'healthy' : 'unhealthy';
-            container.innerHTML = `<span class="service-indicator unified ${healthClass}" title="teamsync-editor: ${status}">Unified</span>`;
+            container.innerHTML = `<span class="service-indicator unified ${healthClass}" title="teamsync-editor: ${status}">TeamSync</span>`;
+        } else if (this.editorMode === 'collabora') {
+            // Show Collabora indicator
+            const status = this.serviceStatus['collabora'];
+            const healthClass = status === 'healthy' ? 'healthy' : 'unhealthy';
+            container.innerHTML = `<span class="service-indicator collabora ${healthClass}" title="collabora: ${status}">Collabora</span>`;
+        } else if (this.editorMode === 'document-source') {
+            // Show Document Source indicator
+            const status = this.serviceStatus['document-source'];
+            const healthClass = status === 'healthy' ? 'healthy' : 'unhealthy';
+            container.innerHTML = `<span class="service-indicator document-source ${healthClass}" title="document-source: ${status}">Doc Source</span>`;
         } else {
             // Show multi-app indicators
             const services = [
@@ -489,10 +515,17 @@ class TeamSyncApp {
     }
 
     isServiceAvailable(docType) {
-        if (this.useUnifiedEditor) {
-            // In unified mode, all file types use the same editor service
+        if (this.editorMode === 'teamsync-unified') {
+            // In TeamSync unified mode, all file types use the same editor service
             return this.serviceStatus['teamsync-editor'] === 'healthy';
+        } else if (this.editorMode === 'collabora') {
+            // In Collabora mode, use the official Collabora service
+            return this.serviceStatus['collabora'] === 'healthy';
+        } else if (this.editorMode === 'document-source') {
+            // In Document Source mode, use the teamsync-document-source service
+            return this.serviceStatus['document-source'] === 'healthy';
         }
+        // In multi-editor mode, check the specific service for this document type
         const productInfo = this.getProductInfo(docType);
         return this.serviceStatus[productInfo.service] === 'healthy';
     }
@@ -552,7 +585,7 @@ class TeamSyncApp {
 
             // Get WOPI access token and iframe URL from the backend
             // Always request fresh token with cache-busting
-            console.log(`[DEBUG] Requesting fresh token for ${doc.id} (unified=${this.useUnifiedEditor})...`);
+            console.log(`[DEBUG] Requesting fresh token for ${doc.id} (mode=${this.editorMode})...`);
             const tokenStartTime = performance.now();
             const response = await fetch(`${this.config.apiBaseUrl}/documents/${doc.id}/token?_t=${Date.now()}`, {
                 method: 'POST',
@@ -563,7 +596,7 @@ class TeamSyncApp {
                 },
                 body: JSON.stringify({
                     permissions: 'edit',
-                    useUnifiedEditor: this.useUnifiedEditor
+                    editorMode: this.editorMode
                 }),
                 cache: 'no-store'
             });

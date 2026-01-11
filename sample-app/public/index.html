@@ -18,13 +18,59 @@
                 <span>TeamSync Editor</span>
             </div>
             <div class="header-actions">
-                <div class="editor-mode-toggle">
-                    <span class="toggle-label">Multi-App</span>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="unified-editor-toggle">
-                        <span class="toggle-slider"></span>
-                    </label>
-                    <span class="toggle-label">Unified</span>
+                <div class="editor-mode-selector">
+                    <span class="selector-label">Editor Mode:</span>
+                    <div class="mode-options">
+                        <label class="mode-option" data-mode="teamsync-unified">
+                            <input type="radio" name="editor-mode" value="teamsync-unified">
+                            <span class="mode-button">
+                                <span class="mode-icon">
+                                    <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                                        <rect x="1" y="1" width="12" height="12" rx="2"/>
+                                    </svg>
+                                </span>
+                                <span class="mode-name">TeamSync Editor</span>
+                            </span>
+                        </label>
+                        <label class="mode-option" data-mode="multi-editor">
+                            <input type="radio" name="editor-mode" value="multi-editor">
+                            <span class="mode-button">
+                                <span class="mode-icon">
+                                    <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                                        <rect x="0" y="0" width="4" height="4" rx="1"/>
+                                        <rect x="5" y="0" width="4" height="4" rx="1"/>
+                                        <rect x="10" y="0" width="4" height="4" rx="1"/>
+                                        <rect x="0" y="5" width="4" height="9" rx="1"/>
+                                        <rect x="5" y="5" width="4" height="9" rx="1"/>
+                                        <rect x="10" y="5" width="4" height="9" rx="1"/>
+                                    </svg>
+                                </span>
+                                <span class="mode-name">Multi-Editor</span>
+                            </span>
+                        </label>
+                        <label class="mode-option" data-mode="collabora">
+                            <input type="radio" name="editor-mode" value="collabora">
+                            <span class="mode-button">
+                                <span class="mode-icon">
+                                    <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                                        <circle cx="7" cy="7" r="6"/>
+                                    </svg>
+                                </span>
+                                <span class="mode-name">Collabora</span>
+                            </span>
+                        </label>
+                        <label class="mode-option" data-mode="document-source">
+                            <input type="radio" name="editor-mode" value="document-source">
+                            <span class="mode-button">
+                                <span class="mode-icon">
+                                    <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                                        <path d="M2 1h7l3 3v9a1 1 0 01-1 1H2a1 1 0 01-1-1V2a1 1 0 011-1zm6 1v3h3M4 7h6M4 10h6"/>
+                                    </svg>
+                                </span>
+                                <span class="mode-name">Doc Source</span>
+                            </span>
+                        </label>
+                    </div>
                 </div>
                 <span id="connection-status" class="status-badge status-disconnected">
                     Disconnected

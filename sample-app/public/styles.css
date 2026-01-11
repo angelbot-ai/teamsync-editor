@@ -78,80 +78,133 @@ body {
     gap: 16px;
 }
 
-/* Editor Mode Toggle */
-.editor-mode-toggle {
+/* Editor Mode Selector (3-way toggle) */
+.editor-mode-selector {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px 12px;
-    background: var(--background);
-    border-radius: 20px;
-    border: 1px solid var(--border);
+    gap: 10px;
 }
 
-.toggle-label {
+.selector-label {
     font-size: 12px;
     font-weight: 500;
     color: var(--text-secondary);
-    transition: color 0.2s;
+    white-space: nowrap;
 }
 
-.toggle-label:first-child {
-    color: var(--primary-color);
+.mode-options {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px;
+    background: var(--background);
+    border-radius: 8px;
+    border: 1px solid var(--border);
 }
 
-.editor-mode-toggle.unified .toggle-label:first-child {
-    color: var(--text-secondary);
-}
-
-.editor-mode-toggle.unified .toggle-label:last-child {
-    color: var(--primary-color);
-}
-
-.toggle-switch {
+.mode-option {
     position: relative;
-    display: inline-block;
-    width: 36px;
-    height: 20px;
+    cursor: pointer;
 }
 
-.toggle-switch input {
+.mode-option input {
+    position: absolute;
     opacity: 0;
     width: 0;
     height: 0;
 }
 
-.toggle-slider {
-    position: absolute;
-    cursor: pointer;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: var(--border);
-    transition: 0.3s;
-    border-radius: 20px;
+.mode-button {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: transparent;
+    transition: all 0.2s ease;
+    white-space: nowrap;
 }
 
-.toggle-slider:before {
-    position: absolute;
-    content: "";
-    height: 14px;
+.mode-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     width: 14px;
-    left: 3px;
-    bottom: 3px;
-    background-color: white;
-    transition: 0.3s;
-    border-radius: 50%;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    height: 14px;
+    opacity: 0.6;
+    transition: opacity 0.2s;
 }
 
-.toggle-switch input:checked + .toggle-slider {
-    background-color: var(--primary-color);
+.mode-icon svg {
+    width: 14px;
+    height: 14px;
 }
 
-.toggle-switch input:checked + .toggle-slider:before {
-    transform: translateX(16px);
+.mode-option:hover .mode-button {
+    background: var(--surface);
+    color: var(--text-primary);
+}
+
+.mode-option:hover .mode-icon {
+    opacity: 0.8;
+}
+
+/* Active state for selected mode */
+.mode-option.active .mode-button,
+.mode-option input:checked + .mode-button {
+    background: var(--surface);
+    color: var(--primary-color);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.mode-option.active .mode-icon,
+.mode-option input:checked + .mode-button .mode-icon {
+    opacity: 1;
+    color: var(--primary-color);
+}
+
+/* Mode-specific colors when active */
+.mode-option[data-mode="teamsync-unified"].active .mode-button,
+.mode-option[data-mode="teamsync-unified"] input:checked + .mode-button {
+    color: var(--primary-color);
+}
+
+.mode-option[data-mode="multi-editor"].active .mode-button,
+.mode-option[data-mode="multi-editor"] input:checked + .mode-button {
+    color: var(--sheets-color);
+}
+
+.mode-option[data-mode="collabora"].active .mode-button,
+.mode-option[data-mode="collabora"] input:checked + .mode-button {
+    color: #f97316; /* Orange for Collabora */
+}
+
+.mode-option[data-mode="teamsync-unified"].active .mode-icon,
+.mode-option[data-mode="teamsync-unified"] input:checked + .mode-button .mode-icon {
+    color: var(--primary-color);
+}
+
+.mode-option[data-mode="multi-editor"].active .mode-icon,
+.mode-option[data-mode="multi-editor"] input:checked + .mode-button .mode-icon {
+    color: var(--sheets-color);
+}
+
+.mode-option[data-mode="collabora"].active .mode-icon,
+.mode-option[data-mode="collabora"] input:checked + .mode-button .mode-icon {
+    color: #f97316;
+}
+
+.mode-option[data-mode="document-source"].active .mode-button,
+.mode-option[data-mode="document-source"] input:checked + .mode-button {
+    color: #8b5cf6; /* Purple for Document Source */
+}
+
+.mode-option[data-mode="document-source"].active .mode-icon,
+.mode-option[data-mode="document-source"] input:checked + .mode-button .mode-icon {
+    color: #8b5cf6;
 }
 
 /* Status Badge */
@@ -294,6 +347,16 @@ body {
 .service-indicator.unified {
     background: #e0e7ff;
     color: #4338ca;
+}
+
+.service-indicator.collabora {
+    background: #ffedd5;
+    color: #ea580c;
+}
+
+.service-indicator.document-source {
+    background: #ede9fe;
+    color: #7c3aed;
 }
 
 /* Filter Tabs */

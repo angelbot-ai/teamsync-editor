@@ -55,15 +55,27 @@ const config = {
     // TeamSync Editor - unified editor handling ALL document types (internal Docker network URL)
     collaboraEditorUrl: process.env.COLLABORA_EDITOR_URL || 'http://localhost:9983',
 
+    // Official Collabora CODE Docker instance (Railway deployed or local)
+    collaboraOfficialUrl: process.env.COLLABORA_OFFICIAL_URL || 'http://localhost:9984',
+
+    // TeamSync Document Source - built from Collabora source (Railway deployed)
+    documentSourceUrl: process.env.DOCUMENT_SOURCE_URL || 'http://localhost:9985',
+
     // PUBLIC URLs for browser access - these are what the browser iframe will use
     // When running in Docker, the browser needs localhost URLs to access the exposed ports
     collaboraDocumentPublicUrl: process.env.COLLABORA_DOCUMENT_PUBLIC_URL || 'http://localhost:9980',
     collaboraSheetsPublicUrl: process.env.COLLABORA_SHEETS_PUBLIC_URL || 'http://localhost:9981',
     collaboraPresentationPublicUrl: process.env.COLLABORA_PRESENTATION_PUBLIC_URL || 'http://localhost:9982',
     collaboraEditorPublicUrl: process.env.COLLABORA_EDITOR_PUBLIC_URL || 'http://localhost:9983',
+    collaboraOfficialPublicUrl: process.env.COLLABORA_OFFICIAL_PUBLIC_URL || 'http://localhost:9984',
+    documentSourcePublicUrl: process.env.DOCUMENT_SOURCE_PUBLIC_URL || 'http://localhost:9985',
 
-    // Use unified editor mode - routes ALL documents to TeamSync Editor instead of separate services
-    useUnifiedEditor: process.env.USE_UNIFIED_EDITOR === 'true',
+    // Editor mode: 'teamsync-unified' | 'multi-editor' | 'collabora' | 'document-source'
+    // - teamsync-unified: Use single TeamSync Editor for all documents
+    // - multi-editor: Use specialized TeamSync editors (Document/Sheets/Presentation)
+    // - collabora: Use official Collabora CODE Docker image
+    // - document-source: Use TeamSync Document Source (built from Collabora source)
+    editorMode: process.env.EDITOR_MODE || 'teamsync-unified',
 
     // This sample app's public URL (for browser access)
     publicUrl: process.env.PUBLIC_URL || 'http://localhost:8080',
@@ -286,13 +298,20 @@ function getDocumentType(filename) {
 /**
  * Get the appropriate Collabora URL for a document type (internal Docker network)
  * Used for server-to-server communication (health checks, discovery)
+ * @param {string} docType - The document type (document, spreadsheet, presentation)
+ * @param {string} editorMode - The editor mode (teamsync-unified, multi-editor, collabora)
  */
-function getCollaboraUrlForType(docType) {
-    // If unified editor mode is enabled, route ALL documents to TeamSync Editor
-    if (config.useUnifiedEditor) {
+function getCollaboraUrlForType(docType, editorMode = config.editorMode) {
+    // Route based on editor mode
+    if (editorMode === 'teamsync-unified') {
         return config.collaboraEditorUrl;
+    } else if (editorMode === 'collabora') {
+        return config.collaboraOfficialUrl;
+    } else if (editorMode === 'document-source') {
+        return config.documentSourceUrl;
     }
 
+    // Multi-editor mode: use specialized editors
     switch (docType) {
         case 'spreadsheet':
             return config.collaboraSheetsUrl;
@@ -307,13 +326,20 @@ function getCollaboraUrlForType(docType) {
 /**
  * Get the PUBLIC Collabora URL for a document type (for browser iframe)
  * Used for building the iframe src that the browser will load
+ * @param {string} docType - The document type (document, spreadsheet, presentation)
+ * @param {string} editorMode - The editor mode (teamsync-unified, multi-editor, collabora, document-source)
  */
-function getCollaboraPublicUrlForType(docType) {
-    // If unified editor mode is enabled, route ALL documents to TeamSync Editor
-    if (config.useUnifiedEditor) {
+function getCollaboraPublicUrlForType(docType, editorMode = config.editorMode) {
+    // Route based on editor mode
+    if (editorMode === 'teamsync-unified') {
         return config.collaboraEditorPublicUrl;
+    } else if (editorMode === 'collabora') {
+        return config.collaboraOfficialPublicUrl;
+    } else if (editorMode === 'document-source') {
+        return config.documentSourcePublicUrl;
     }
 
+    // Multi-editor mode: use specialized editors
     switch (docType) {
         case 'spreadsheet':
             return config.collaboraSheetsPublicUrl;
@@ -382,24 +408,20 @@ async function getCollaboraUrlPath(collaboraUrl) {
     return discovery.urlPath;
 }
 
-async function buildIframeSrc(fileId, accessToken, filename, useUnifiedEditor = false) {
+async function buildIframeSrc(fileId, accessToken, filename, editorMode = config.editorMode) {
     const startTime = Date.now();
-    // Determine which Collabora instance to use based on file type or unified mode
+    // Determine which Collabora instance to use based on file type and editor mode
     const docType = getDocumentType(filename);
 
-    let collaboraInternalUrl, collaboraPublicUrl;
+    const collaboraInternalUrl = getCollaboraUrlForType(docType, editorMode);
+    const collaboraPublicUrl = getCollaboraPublicUrlForType(docType, editorMode);
 
-    if (useUnifiedEditor) {
-        // Unified mode: use single editor for all document types
-        collaboraInternalUrl = config.collaboraEditorUrl;
-        collaboraPublicUrl = config.collaboraEditorPublicUrl;
-        console.log(`[Router] Building iframe for "${filename}" (${docType}) - UNIFIED MODE`);
-    } else {
-        // Multi-app mode: use type-specific servers
-        collaboraInternalUrl = getCollaboraUrlForType(docType);
-        collaboraPublicUrl = getCollaboraPublicUrlForType(docType);
-        console.log(`[Router] Building iframe for "${filename}" (${docType}) - MULTI-APP MODE`);
-    }
+    const modeLabels = {
+        'teamsync-unified': 'TEAMSYNC UNIFIED',
+        'multi-editor': 'MULTI-EDITOR',
+        'collabora': 'COLLABORA OFFICIAL'
+    };
+    console.log(`[Router] Building iframe for "${filename}" (${docType}) - ${modeLabels[editorMode] || editorMode} MODE`);
 
     console.log(`[Router]   Internal URL: ${collaboraInternalUrl}`);
     console.log(`[Router]   Public URL:   ${collaboraPublicUrl}`);
@@ -508,33 +530,47 @@ app.get('/api/health', async (req, res) => {
                 }
             };
 
-            const [docStatus, sheetsStatus, presentationStatus, editorStatus] = await Promise.all([
+            const [docStatus, sheetsStatus, presentationStatus, editorStatus, collaboraStatus, documentSourceStatus] = await Promise.all([
                 checkInstance('document', config.collaboraDocumentUrl),
                 checkInstance('sheets', config.collaboraSheetsUrl),
                 checkInstance('presentation', config.collaboraPresentationUrl),
-                checkInstance('editor', config.collaboraEditorUrl)
+                checkInstance('editor', config.collaboraEditorUrl),
+                checkInstance('collabora', config.collaboraOfficialUrl),
+                checkInstance('document-source', config.documentSourceUrl)
             ]);
 
-            // In unified mode, only editor needs to be healthy
-            // In multi-variant mode, all specialized editors should be healthy
-            const allHealthy = config.useUnifiedEditor
-                ? editorStatus === 'healthy'
-                : (docStatus === 'healthy' && sheetsStatus === 'healthy' && presentationStatus === 'healthy');
+            // Determine health based on current editor mode
+            let allHealthy;
+            if (config.editorMode === 'teamsync-unified') {
+                allHealthy = editorStatus === 'healthy';
+            } else if (config.editorMode === 'collabora') {
+                allHealthy = collaboraStatus === 'healthy';
+            } else if (config.editorMode === 'document-source') {
+                allHealthy = documentSourceStatus === 'healthy';
+            } else {
+                // multi-editor mode
+                allHealthy = docStatus === 'healthy' && sheetsStatus === 'healthy' && presentationStatus === 'healthy';
+            }
+
             const anyHealthy = docStatus === 'healthy' ||
                                sheetsStatus === 'healthy' ||
                                presentationStatus === 'healthy' ||
-                               editorStatus === 'healthy';
+                               editorStatus === 'healthy' ||
+                               collaboraStatus === 'healthy' ||
+                               documentSourceStatus === 'healthy';
 
             return res.json({
                 status: allHealthy ? 'healthy' : (anyHealthy ? 'partial' : 'degraded'),
-                mode: config.useUnifiedEditor ? 'unified-editor' : 'multi-variant',
+                mode: config.editorMode,
                 timestamp: new Date().toISOString(),
                 services: {
                     sampleApp: 'healthy',
                     'teamsync-document': docStatus,
                     'teamsync-sheets': sheetsStatus,
                     'teamsync-presentation': presentationStatus,
-                    'teamsync-editor': editorStatus
+                    'teamsync-editor': editorStatus,
+                    'collabora': collaboraStatus,
+                    'document-source': documentSourceStatus
                 }
             });
         }
@@ -550,23 +586,26 @@ app.get('/api/health', async (req, res) => {
 
 /**
  * Get/Set editor mode configuration
+ * Editor modes: 'teamsync-unified' | 'multi-editor' | 'collabora'
  */
 app.get('/api/config/editor-mode', (req, res) => {
     res.json({
-        useUnifiedEditor: config.useUnifiedEditor,
-        mode: config.useUnifiedEditor ? 'unified' : 'multi-app'
+        editorMode: config.editorMode,
+        mode: config.editorMode
     });
 });
 
 app.post('/api/config/editor-mode', (req, res) => {
-    const { useUnifiedEditor } = req.body;
-    if (typeof useUnifiedEditor === 'boolean') {
-        config.useUnifiedEditor = useUnifiedEditor;
-        console.log(`[Config] Editor mode changed to: ${useUnifiedEditor ? 'unified' : 'multi-app'}`);
+    const { editorMode } = req.body;
+    const validModes = ['teamsync-unified', 'multi-editor', 'collabora', 'document-source'];
+
+    if (editorMode && validModes.includes(editorMode)) {
+        config.editorMode = editorMode;
+        console.log(`[Config] Editor mode changed to: ${editorMode}`);
     }
     res.json({
-        useUnifiedEditor: config.useUnifiedEditor,
-        mode: config.useUnifiedEditor ? 'unified' : 'multi-app'
+        editorMode: config.editorMode,
+        mode: config.editorMode
     });
 });
 
@@ -625,11 +664,11 @@ app.post('/api/documents/:fileId/token', validateAppAuth, async (req, res) => {
     const startTime = Date.now();
     try {
         const { fileId } = req.params;
-        const { permissions = 'edit', useUnifiedEditor } = req.body;
+        const { permissions = 'edit', editorMode } = req.body;
 
         // Use client preference if provided, otherwise fall back to server config
-        const effectiveUnifiedMode = useUnifiedEditor !== undefined ? useUnifiedEditor : config.useUnifiedEditor;
-        console.log(`[API] Token request: fileId=${fileId} permissions=${permissions} unifiedEditor=${effectiveUnifiedMode}`);
+        const effectiveEditorMode = editorMode || config.editorMode;
+        console.log(`[API] Token request: fileId=${fileId} permissions=${permissions} editorMode=${effectiveEditorMode}`);
 
         // Verify document exists
         if (!localDocuments.has(fileId)) {
@@ -641,21 +680,21 @@ app.post('/api/documents/:fileId/token', validateAppAuth, async (req, res) => {
         // Generate WOPI access token (JWT)
         const accessToken = tokenService.generateWopiToken(fileId, req.user, permissions);
 
-        // Build iframe URL for Collabora (routes to correct server based on file type or unified mode)
-        const iframeSrc = await buildIframeSrc(fileId, accessToken, doc.name, effectiveUnifiedMode);
+        // Build iframe URL for Collabora (routes to correct server based on file type and editor mode)
+        const iframeSrc = await buildIframeSrc(fileId, accessToken, doc.name, effectiveEditorMode);
 
         // Determine document type for client info
         const docType = getDocumentType(doc.name);
 
         const elapsed = Date.now() - startTime;
-        console.log(`[API] Token issued: file=${fileId} (${docType}) user=${req.user.id} permissions=${permissions} unified=${effectiveUnifiedMode} - ${elapsed}ms`);
+        console.log(`[API] Token issued: file=${fileId} (${docType}) user=${req.user.id} permissions=${permissions} editorMode=${effectiveEditorMode} - ${elapsed}ms`);
 
         res.json({
             accessToken,
             accessTokenTtl: tokenService.getTokenTtlMs(),
             iframeSrc,
             documentType: docType,
-            unifiedEditor: effectiveUnifiedMode
+            editorMode: effectiveEditorMode
         });
     } catch (error) {
         const elapsed = Date.now() - startTime;
@@ -956,7 +995,11 @@ Collabora Instances:
   - Document:     ${config.collaboraDocumentUrl}
   - Sheets:       ${config.collaboraSheetsUrl}
   - Presentation: ${config.collaboraPresentationUrl}
-  - Editor:       ${config.collaboraEditorUrl} ${config.useUnifiedEditor ? '(ACTIVE - unified mode)' : ''}
+  - Editor:       ${config.collaboraEditorUrl}
+  - Collabora:    ${config.collaboraOfficialUrl}
+  - Doc Source:   ${config.documentSourceUrl}
+
+Editor Mode: ${config.editorMode}
 
 Authentication:
   - JWT Secret: ${config.jwtSecret.slice(0, 10)}... (${config.jwtSecret.length} chars)
@@ -967,21 +1010,36 @@ Documents loaded: ${Array.from(localDocuments.keys()).join(', ') || 'none'}
 `);
 
     if (config.standaloneMode) {
-        if (config.useUnifiedEditor) {
-            console.log('[Unified Editor Mode] All documents routed to TeamSync Editor:');
-            console.log('  .docx/.doc/.odt/.xlsx/.xls/.ods/.pptx/.ppt/.odp -> TeamSync Editor (port 9983)');
-            console.log('\nMake sure TeamSync Editor is running:');
-            console.log('  docker-compose -f docker-compose.editor.yml up -d\n');
-        } else {
-            console.log('[Multi-Variant Mode] Documents routed to specialized editors:');
-            console.log('  .docx/.doc/.odt -> TeamSync Document (port 9980)');
-            console.log('  .xlsx/.xls/.ods -> TeamSync Sheets (port 9981)');
-            console.log('  .pptx/.ppt/.odp -> TeamSync Presentation (port 9982)');
-            console.log('\nMake sure all TeamSync containers are running:');
-            console.log('  docker-compose -f docker-compose.multi.yml up -d');
-            console.log('\nOr use unified editor (USE_UNIFIED_EDITOR=true) with:');
-            console.log('  docker-compose -f docker-compose.editor.yml up -d\n');
-        }
+        const modeInfo = {
+            'teamsync-unified': {
+                label: 'TeamSync Unified Editor',
+                routing: '  All documents -> TeamSync Editor (port 9983)',
+                setup: '  docker-compose -f docker-compose.editor.yml up -d'
+            },
+            'multi-editor': {
+                label: 'Multi-Editor Mode',
+                routing: `  .docx/.doc/.odt -> TeamSync Document (port 9980)
+  .xlsx/.xls/.ods -> TeamSync Sheets (port 9981)
+  .pptx/.ppt/.odp -> TeamSync Presentation (port 9982)`,
+                setup: '  docker-compose -f docker-compose.multi.yml up -d'
+            },
+            'collabora': {
+                label: 'Collabora Official',
+                routing: '  All documents -> Official Collabora CODE (port 9984)',
+                setup: '  docker run -e "domain=host.docker.internal" -p 9984:9980 collabora/code'
+            },
+            'document-source': {
+                label: 'Document Source (Forked)',
+                routing: '  All documents -> TeamSync Document Source (port 9985)',
+                setup: '  Built from editor-source repo with custom branding'
+            }
+        };
+
+        const mode = modeInfo[config.editorMode] || modeInfo['teamsync-unified'];
+        console.log(`[${mode.label}] Document routing:`);
+        console.log(mode.routing);
+        console.log('\nMake sure the editor is running:');
+        console.log(mode.setup + '\n');
     }
 });
 
