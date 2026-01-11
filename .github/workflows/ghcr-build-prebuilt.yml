@@ -37,15 +37,15 @@ on:
           - sheets
           - presentation
       coolwsd_version:
-        description: 'Coolwsd artifact version (e.g., v25.04-teamsync.1)'
+        description: 'Coolwsd artifact version (e.g., v25.04-teamsync.2)'
         required: true
-        default: 'v25.04-teamsync.1'
+        default: 'v25.04-teamsync.2'
         type: string
 
 env:
   REGISTRY: ghcr.io
   # Default coolwsd artifact version - update when new artifacts are released
-  COOLWSD_VERSION: ${{ inputs.coolwsd_version || 'v25.04-teamsync.1' }}
+  COOLWSD_VERSION: ${{ inputs.coolwsd_version || 'v25.04-teamsync.2' }}
 
 jobs:
   build-document:
