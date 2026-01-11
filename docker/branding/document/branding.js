@@ -2,10 +2,15 @@
  * TeamSync Document - Runtime Branding JavaScript
  * Word processing variant
  *
- * License Compliance:
- * - This software is based on Collabora Online, licensed under MPL 2.0
- * - Per Collabora's Trademark Policy, their trademarks have been removed from UI
- * - Source code available at: https://github.com/angelbot-ai-pvt-ltd/teamsync-editor
+ * Copyright 2024-2025 Angelbot AI Pvt Ltd
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ *
+ * This software is based on Collabora Online, licensed under MPL 2.0.
+ * Per Collabora's Trademark Policy, their trademarks have been removed from UI.
+ * Source code: https://github.com/angelbot-ai-pvt-ltd/teamsync-editor
  * ============================================================================= */
 
 (function() {

@@ -160,4 +160,4 @@ This sample app is for **demonstration purposes only**. For production:
 
 ## License
 
-MIT License - See the main project LICENSE file.
+Mozilla Public License 2.0 - See the main project [LICENSE](../LICENSE) file.

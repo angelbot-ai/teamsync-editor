@@ -18,7 +18,7 @@
     "office"
   ],
   "author": "",
-  "license": "MIT",
+  "license": "MPL-2.0",
   "dependencies": {
     "docx": "^9.5.1",
     "exceljs": "^4.4.0",

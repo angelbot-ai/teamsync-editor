@@ -1,0 +1,48 @@
+TeamSync Editor
+Copyright 2024-2025 Angelbot AI Pvt Ltd
+
+This product includes software developed by:
+
+- Collabora Online (https://github.com/CollaboraOnline/online)
+  Copyright Collabora Ltd. and/or its affiliates
+  Licensed under the Mozilla Public License 2.0
+
+- LibreOffice (https://www.libreoffice.org/)
+  Copyright The Document Foundation
+  Licensed under the Mozilla Public License 2.0
+
+--------------------------------------------------------------------------------
+
+MOZILLA PUBLIC LICENSE 2.0 NOTICE
+
+This Source Code Form is subject to the terms of the Mozilla Public License,
+v. 2.0. If a copy of the MPL was not distributed with this file, You can
+obtain one at https://mozilla.org/MPL/2.0/.
+
+--------------------------------------------------------------------------------
+
+TRADEMARK NOTICE
+
+"TeamSync", "TeamSync Document", "TeamSync Sheets", and "TeamSync Presentation"
+are trademarks of Angelbot AI Pvt Ltd.
+
+"Collabora" and "Collabora Online" are trademarks of Collabora Ltd.
+These trademarks have been removed from the user interface in accordance
+with Collabora's Trademark Policy.
+
+"LibreOffice" is a trademark of The Document Foundation.
+
+--------------------------------------------------------------------------------
+
+SOURCE CODE AVAILABILITY
+
+As required by MPL 2.0, the complete source code for TeamSync Editor
+is available at: https://github.com/angelbot-ai-pvt-ltd/teamsync-editor
+
+--------------------------------------------------------------------------------
+
+THIRD-PARTY LICENSES
+
+This software may include third-party open source software components, each of
+which has its own license. Please see the individual component directories or
+the package manager manifests for their respective license information.
