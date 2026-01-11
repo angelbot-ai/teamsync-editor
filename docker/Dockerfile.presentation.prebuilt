@@ -90,6 +90,11 @@ RUN curl -fsSL https://www.collaboraoffice.com/downloads/gpg/collaboraonline-rel
         collaboraofficebasis-en-us \
         # coolwsd-deprecated for coolforkit-caps (Railway compatibility)
         coolwsd-deprecated \
+    # === SIZE OPTIMIZATION: Reduce fonts to Liberation only (~170 MB savings) ===
+    # Liberation fonts provide MS Office compatible substitutes:
+    # Liberation Sans → Arial, Liberation Serif → Times New Roman, Liberation Mono → Courier
+    && cd /opt/collaboraoffice/share/fonts/truetype \
+    && find . -type f ! -name "Liberation*" -delete \
     # Remove package-installed coolwsd files (we use prebuilt version)
     && rm -rf /usr/bin/coolwsd /usr/bin/coolforkit /usr/bin/coolmount \
               /usr/share/coolwsd /etc/coolwsd \
