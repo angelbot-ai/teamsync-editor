@@ -214,7 +214,7 @@ if [ -n "$COOL_ADMIN_PASSWORD" ]; then
     COOLWSD_ARGS+=("--o:admin_console.password=${COOL_ADMIN_PASSWORD}")
 fi
 
-# Log level - default to warning for production
+# Log level - default to warning for production (reduces Railway log rate limit issues)
 LOG_LEVEL="${LOG_LEVEL:-warning}"
 COOLWSD_ARGS+=("--o:logging.level=${LOG_LEVEL}")
 
