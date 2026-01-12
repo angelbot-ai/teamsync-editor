@@ -74,7 +74,7 @@ sample-app/
 │  └──────────────┘    └──────────────┘    └──────────────┘  │
 │         │                                       │           │
 │         │         ┌──────────────────┐         │           │
-│         └────────▶│ Collabora Online │◀────────┘           │
+│         └────────▶│ TeamSync Editor  │◀────────┘           │
 │                   │   (Editor UI)    │                      │
 │                   └──────────────────┘                      │
 └─────────────────────────────────────────────────────────────┘
@@ -87,7 +87,7 @@ sample-app/
 3. **Sample server generates auth token** and requests WOPI token from TeamSync WOPI Host
 4. **WOPI Host returns iframe URL** with embedded access token
 5. **Frontend loads the editor** in an iframe
-6. **Collabora Online connects** to WOPI Host for file operations
+6. **TeamSync Editor connects** to WOPI Host for file operations
 7. **User edits the document** in real-time
 8. **Changes are saved** back to storage via WOPI protocol
 

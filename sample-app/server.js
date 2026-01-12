@@ -664,7 +664,7 @@ app.post('/api/documents/:fileId/token', validateAppAuth, async (req, res) => {
         // Generate WOPI access token (JWT)
         const accessToken = tokenService.generateWopiToken(fileId, req.user, permissions);
 
-        // Build iframe URL for Collabora (routes to correct server based on file type and editor mode)
+        // Build iframe URL for editor (routes to correct server based on file type and editor mode)
         const iframeSrc = await buildIframeSrc(fileId, accessToken, doc.name, effectiveEditorMode);
 
         // Determine document type for client info
@@ -711,7 +711,7 @@ app.post('/api/auth/token', (req, res) => {
 
 // ============================================================================
 // WOPI Protocol Endpoints
-// These endpoints are called by Collabora Online to access documents
+// These endpoints are called by TeamSync Editor to access documents
 // ============================================================================
 
 // Rate limiter for WOPI endpoints to prevent abuse
@@ -725,7 +725,7 @@ const wopiRateLimiter = rateLimit({
 
 /**
  * WOPI CheckFileInfo - Get file metadata
- * Called when Collabora opens a document
+ * Called when TeamSync Editor opens a document
  */
 app.get('/wopi/files/:fileId', wopiRateLimiter, validateWopiToken, (req, res) => {
     const startTime = Date.now();
@@ -772,7 +772,7 @@ app.get('/wopi/files/:fileId', wopiRateLimiter, validateWopiToken, (req, res) =>
 
         // Status
         IsAnonymousUser: false,
-        IsAdminUser: true,  // Set to true to enable admin features in Collabora
+        IsAdminUser: true,  // Set to true to enable admin features in TeamSync Editor
         ReadOnly: !canWrite,
         RestrictedWebViewOnly: false,
         LastModifiedTime: doc.lastModified,
@@ -985,10 +985,10 @@ app.listen(PORT, () => {
 ╚════════════════════════════════════════════════════════════════╝
 
 TeamSync Editor Instances:
-  - Document:     ${config.collaboraDocumentUrl}
-  - Sheets:       ${config.collaboraSheetsUrl}
-  - Presentation: ${config.collaboraPresentationUrl}
-  - Editor:       ${config.collaboraEditorUrl}
+  - Document:     ${config.documentEditorUrl}
+  - Sheets:       ${config.sheetsEditorUrl}
+  - Presentation: ${config.presentationEditorUrl}
+  - Unified:      ${config.unifiedEditorUrl}
 
 Editor Mode: ${config.editorMode}
 

@@ -161,7 +161,7 @@ async function createSampleDocument() {
                     new Paragraph({
                         children: [
                             new TextRun({
-                                text: "Created with TeamSync Document - Powered by Collabora Online",
+                                text: "Created with TeamSync Document",
                                 italics: true,
                                 color: "666666",
                             }),

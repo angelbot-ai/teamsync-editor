@@ -649,7 +649,7 @@ class TeamSyncApp {
     }
 
     /**
-     * Handle messages from the Collabora Online editor iframe
+     * Handle messages from the TeamSync Editor iframe
      */
     handleEditorMessage(event) {
         const data = event.data;
