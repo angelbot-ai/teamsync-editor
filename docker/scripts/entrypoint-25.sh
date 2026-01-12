@@ -182,13 +182,26 @@ COOLWSD_ARGS=(
     "--o:cache_files.expiry_min=1000"
     # Performance tuning (matching official Collabora defaults)
     "--o:num_prespawn_children=4"
-    "--o:per_document.max_concurrency=4"
     "--o:per_document.limit_load_secs=100"
     "--o:per_document.idle_timeout_secs=3600"
     "--o:per_document.limit_store_failures=5"
     "--o:per_document.cleanup.cleanup_interval_ms=10000"
     "--o:per_document.cleanup.bad_behavior_period_secs=60"
     "--o:per_document.cleanup.idle_time_secs=300"
+    # ===== TYPING RESPONSIVENESS OPTIMIZATIONS =====
+    # Increase parallel processing for faster tile updates
+    "--o:per_document.max_concurrency=8"
+    # Reduce save interruptions during typing
+    "--o:per_document.min_time_between_saves_ms=1000"
+    "--o:per_document.min_time_between_uploads_ms=10000"
+    "--o:per_document.idlesave_duration_secs=60"
+    "--o:per_document.autosave_duration_secs=300"
+    # Use background save to avoid blocking UI
+    "--o:per_document.background_autosave=true"
+    "--o:per_document.background_manualsave=true"
+    # Keep views active longer to avoid re-rendering overhead
+    "--o:per_view.out_of_focus_timeout_secs=600"
+    "--o:per_view.idle_timeout_secs=1800"
 )
 
 # Add config file if it exists and is set
